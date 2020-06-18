@@ -1,6 +1,6 @@
 # Cotrendy
 
-A complete rewrite of generalisation of Trendy
+A complete rewrite and generalisation of Trendy
 
 # Key components of Cotrendy
 
@@ -14,7 +14,7 @@ Cotrendy is setup using a configuration file in the [TOML format](https://github
 
 The bayesian maximum a posteriori (MAP) method of cotrending requires supplimentary information about the target under study and its neighbours. This is supplied as a catalog of information (currently, RA, Dec, Magnitude).
 
-   1. The location of the input catalog is given in the configuration file under ```catalog.path```
+   1. The location of the input catalog is given in the configuration file under ```{global.root}/{catalog.cat_file}```
    1. Supported formats are fits and text inputs
    1. The catalog is assumed to contain 3 colums, Ra, Dec and Mag in that order
    1. If a text file is supplied it should be space separated columns
@@ -35,7 +35,7 @@ Note: you can import the pickling functions to pickle your own numpy arrays usin
 tool.
 
 ```python
-from trendier.utils import picklify
+from cotrendy.utils import picklify
 
 # times is your 1D timestamp array
 # fluxes and errors are your two 2D flux and error arrays
@@ -44,8 +44,7 @@ picklify('fluxes.pkl', fluxes)
 picklify('errors.pkl', errors)
 ```
 
-I have written tools in ```trendy.lightcurves``` to extract and pickle data from various instruments
-(those I've played with). There is currently support for:
+I have made a couple of functions in ```cotrendy.INSTRUMENT_NAME``` to help prepare the data in the correct formats.
+There are functions currently available for:
 
-   1. The NGTS quick look pipelines (photX.X) files
-   1. TESS full frame image photometry from S. Gill
+   1. NGTS QLP
