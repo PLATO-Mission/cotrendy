@@ -1,0 +1,49 @@
+
+def _fit_cbvs_to_data(x, y, vectors):
+    """
+    Similar to _fit_cbv_to_data
+    but simultaneously does all coeffs
+
+    Parameters
+    ----------
+    x : array
+        list of fit coeffs
+    y : array
+        light curve array
+    vectors : array
+        list of co trending basis vectors
+
+    Returns
+    -------
+    res : array
+        residuals after subtracting the model
+    """
+    # x comes in as a numpy array of guess coeffs
+    # we need to make it a column array to scale each vector
+    xc = x.reshape(-1, 1)
+    # grab the vectors from their dictionary
+    vect_store = []
+    for c in vectors.keys():
+        vect_store.append(vectors[c])
+
+    # make them into a numpy array
+    vect_store = np.array(vect_store)
+    # scale them by the fit coeffs
+    scaled_vect_store = vect_store * xc
+    # sum the scaled cbvs to make the correction light curve
+    model = np.sum(scaled_vect_store, axis=0)
+    # subtract the model from the data and return the residuals
+    return y - model
+
+object_id=6275
+res = optimization.least_squares(_fit_cbvs_to_data, x, args=(cbvs.norm_flux_array[object_id], cbvs.cbvs), loss='soft_l1')
+xc = res['x']
+xc = xc.reshape(-1, 1)
+scaled_vect_store = vect_store * xc
+model = np.sum(scaled_vect_store, axis=0)
+corr = cbvs.norm_flux_array[object_id] - model
+fig, ax = plt.subplots(2, figsize=(10, 10))
+ax[0].plot(cbvs.norm_flux_array[object_id], 'g.')
+ax[1].plot(corr, 'r.')
+fig.tight_layout()
+plt.show()
