@@ -1,12 +1,12 @@
-# Trendier
+# Cotrendy
 
 A complete rewrite of generalisation of Trendy
 
-# Key components of Trendier
+# Key components of Cotrendy
 
 ### Configuration file
 
-Trendier is setup using a configuration file in the [TOML format](https://github.com/toml-lang/toml). Below is an example configuration file. Each parameter is explained using inline comments.
+Cotrendy is setup using a configuration file in the [TOML format](https://github.com/toml-lang/toml). Below is an example configuration file. Each parameter is explained using inline comments.
 
 *TODO ADD EXAMPLE TOML FILE*
 
@@ -22,14 +22,14 @@ The bayesian maximum a posteriori (MAP) method of cotrending requires suppliment
 
 ### Photometry
 
-Trendier needs times, fluxes for a list of stars and errors on those flux values. To be as agnostic
+Cotrendy needs times, fluxes for a list of stars and errors on those flux values. To be as agnostic
 towards different instruments as possible we expect the input data in the following format.
 
    1. A pickled 1D numpy array containing the timestamps for the data
    1. A pickled 2D numpy array containing flux measurements, 1 row per star
    1. A pickled 2D numpy array of the same shape as above, containing errors on the flxues
 
-Do whatever you like to extract your data, but present it to Trendier as pickled numpy arrays.
+Do whatever you like to extract your data, but present it to Cotrendy as pickled numpy arrays.
 
 Note: you can import the pickling functions to pickle your own numpy arrays using you own data extraction 
 tool.
