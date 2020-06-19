@@ -1,6 +1,7 @@
 """
 Code for handling NGTS data
 """
+import sys
 import traceback
 import numpy as np
 import cotrendy.utils as cuts

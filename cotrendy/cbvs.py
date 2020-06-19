@@ -1,6 +1,7 @@
 """
 Cotrending Basis Vectors compoents for Cotrendy
 """
+import sys
 import traceback
 from collections import defaultdict
 import numpy as np

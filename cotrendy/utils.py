@@ -1,6 +1,7 @@
 """
 Utility functions for Cotrendy
 """
+import sys
 import traceback
 import pickle
 import toml
