@@ -1,6 +1,7 @@
 """
 Utility functions for Cotrendy
 """
+import traceback
 import pickle
 import toml
 import numpy as np
@@ -31,6 +32,7 @@ def depicklify(pickle_file):
         of.close()
     except FileNotFoundError:
         print(f"{pickle_file} not found...")
+        traceback.print_exc(file=sys.stdout)
         res = None
     return res
 

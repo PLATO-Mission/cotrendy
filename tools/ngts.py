@@ -1,6 +1,7 @@
 """
 Code for handling NGTS data
 """
+import traceback
 import numpy as np
 import cotrendy.utils as cuts
 
@@ -16,6 +17,7 @@ def read_phot_file(phot_file):
         lcs = pd.read_csv(phot_file, header=None, skiprows=1, delim_whitespace=True)
         n_stars = (len(lcs.columns)-nppc)//npoc
     except FileNotFoundError:
+        traceback.print_exc(file=sys.stdout)
         return None, None, None
 
     # select the different times and columns of interest

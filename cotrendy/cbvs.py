@@ -1,6 +1,7 @@
 """
 Cotrending Basis Vectors compoents for Cotrendy
 """
+import traceback
 from collections import defaultdict
 import numpy as np
 from scipy.stats import pearsonr
@@ -456,6 +457,8 @@ class CBVs():
         # theta which will be used in MAP for generating PDFs
         # do this for each CBV
         for j in cbv_ids:
+            # remember to cast the fit_coeffs as an array for later use
+            self.fit_coeffs[j] = np.array(self.fit_coeffs[j])
             theta_range = abs(max(self.fit_coeffs[j]) - min(self.fit_coeffs[j]))
             # generate generous range of theta
             self.theta[j] = np.linspace(min(self.fit_coeffs[j])-0.10*theta_range,
@@ -527,7 +530,8 @@ class CBVs():
             # this generates the prior, conditional and posterior pdfs
             try:
                 mapp = MAP(catalog, self, target_id, self.direc)
-            except:
+            except Exception:
+                traceback.print_exc(file=sys.stdout)
                 print("MAP failed, skipping...")
                 n_data_points = len(self.norm_flux_array[0])
                 cotrending_flux_array.append(np.zeros(n_data_points))
