@@ -1,5 +1,5 @@
 """
-Catalog components for Trendier
+Catalog components for Cotrendy
 """
 import sys
 import traceback
@@ -67,7 +67,7 @@ class Catalog():
                 traceback.print_exc(file=sys.stdout)
                 sys.exit(1)
 
-        # check if RA spans 0h, plot sin if so, otherwise just plot RA
+        # check if RA spans 0h
         min_ra = np.min(ra)
         max_ra = np.max(ra)
         diff_ra = max_ra - min_ra

@@ -13,6 +13,8 @@ from cotrendy.cbvs import CBVs
 
 # pylint: disable=invalid-name
 
+# TODO: check the weighting is ok and the prior is being used when expected?
+
 def arg_parse():
     """
     Parse the command line arguments

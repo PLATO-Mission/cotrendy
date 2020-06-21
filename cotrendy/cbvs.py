@@ -36,7 +36,7 @@ class CBVs():
           1. Where sigma_y is the polynomial corrected RMS, delta_y is the
              uncertainty of the flux data and Vbar is the median variability
              over all light curves in the sample
-          1. They ignore anything with normalised variability > 1.3
+          1. They ignore anything with normalised variability > cotrend.normalised_variability_limit
           1. Anything < 0.5 is considered very quiet
        1. After the above cut, the remaining stars are pearson correlated and
           the 50% most correlated are used for generating the CBV via SVD
@@ -448,11 +448,6 @@ class CBVs():
             # store the best fitting coeffs for each CBV
             for coeff, cbv_id in zip(xc, cbv_ids):
                 self.fit_coeffs[cbv_id].append(coeff)
-            ## now make it a column array to scale the CBVs
-            #xc = xc.reshape(-1, 1)
-            #scaled_vect_store = self.vect_store * xc
-            #model = np.sum(scaled_vect_store, axis=0)
-            #corr = self.norm_flux_array[i] - model
 
         # now we have the full range of fit coeffs, we can make
         # theta which will be used in MAP for generating PDFs
