@@ -1,6 +1,7 @@
 """
 MAP components for Cotrendy
 """
+import gc
 from collections import defaultdict
 import numpy as np
 from scipy.stats import gaussian_kde
@@ -288,6 +289,9 @@ class MAP():
 
         fig.tight_layout()
         fig.savefig(f"{self.direc}/prior_pdfs_star{self.tus_id:06d}.png")
+        fig.clf()
+        plt.close()
+        gc.collect()
 
     def plot_conditional_pdf(self, cbvs):
         """
@@ -312,6 +316,9 @@ class MAP():
 
         fig.tight_layout()
         fig.savefig(f"{self.direc}/conditional_pdfs_star{self.tus_id:06d}.png")
+        fig.clf()
+        plt.close()
+        gc.collect()
 
     def plot_posterior_pdf(self, cbvs):
         """
@@ -336,3 +343,6 @@ class MAP():
 
         fig.tight_layout()
         fig.savefig(f"{self.direc}/posterior_pdfs_star{self.tus_id:06d}.png")
+        fig.clf()
+        plt.close()
+        gc.collect()

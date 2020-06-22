@@ -1,6 +1,7 @@
 """
 Cotrending Basis Vectors compoents for Cotrendy
 """
+import gc
 import sys
 import traceback
 from collections import defaultdict
@@ -195,6 +196,9 @@ class CBVs():
         ax.set_ylabel('Number')
         fig.tight_layout()
         fig.savefig(f"{self.direc}/variability_camera_{self.camera_id}_{self.phot_file}.pdf")
+        fig.clf()
+        plt.close()
+        gc.collect()
 
     def _calculate_pearson_correlation(self):
         """
@@ -553,7 +557,7 @@ class CBVs():
                 cond_peak_theta = mapp.cond_peak_theta[cbv_id]
                 prior_peak_theta = mapp.prior_peak_theta[cbv_id]
                 prior_cond_diff = abs(prior_peak_theta-cond_peak_theta)
-                if prior_cond_diff > 5*sigma:
+                if prior_cond_diff > 12*sigma:
                     best_theta = prior_peak_theta
                 else:
                     best_theta = cond_peak_theta
