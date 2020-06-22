@@ -104,10 +104,10 @@ class MAP():
         # here we work out which stars are closest in distance
         # we find those below some cut (say 20%) and then
         # take the stddev of the fit coeffs of those stars, then use this
-        # stddev to snap the prior to the condition if the prior is within
+        # stddev to snap the prior to the conditional if the prior is within
         # some sigma of the conditional
         ds = np.copy(distances)
-        obj_id_at_limit = int(len(distances)*0.1)
+        obj_id_at_limit = int(len(distances)*0.2)
         ds.sort()
         distance_limit_for_sigma = ds[obj_id_at_limit]
 
@@ -158,14 +158,15 @@ class MAP():
         valid_cbv_id = sorted(cbvs.theta.keys())[0]
         # number of thetas to try
         n_theta = len(cbvs.theta[valid_cbv_id])
-        # make a 2D copy of the light curve theta times
-        # each successive CBV will be subtracted and a conditional made
-        fit_residuals = data.repeat(n_theta).reshape(len(data), n_theta)
         # grab the stddev of the data
         sigma = np.std(data)
 
         # loop over the CBVs
         for cbv_id in sorted(cbvs.cbvs):
+            # make a 2D copy of the light curve theta times
+            # each successive CBV will be subtracted and a conditional made
+            fit_residuals = data.repeat(n_theta).reshape(len(data), n_theta)
+
             # scale CBV by each theta and subtract it to get the residuals
             for i, t in enumerate(cbvs.theta[cbv_id]):
                 fit_residuals[:, i] -= cbvs.cbvs[cbv_id]*t
@@ -182,11 +183,17 @@ class MAP():
             # check if maximising failed
             if peak_theta is None or peak_pdf is None:
                 self.cond_max_success[cbv_id] = False
+                correction_factor = 0
             else:
                 self.cond_max_success[cbv_id] = True
+                correction_factor = peak_theta
 
             self.cond_peak_theta[cbv_id] = peak_theta
             self.cond_peak_pdf[cbv_id] = peak_pdf
+
+            # update the data and sigma for the next round
+            data = data - (cbvs.cbvs[cbv_id] * correction_factor)
+            sigma = np.std(data)
 
     def calculate_posterior_pdfs(self, cbvs):
         """
