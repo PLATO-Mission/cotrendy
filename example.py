@@ -72,8 +72,12 @@ if __name__ == "__main__":
         # pickle the intermediate CBVs object incase it crashes later
         cuts.picklify(cbv_pickle_file_output, cbvs)
 
-        # cotrend the data using the MAP method
-        cbvs.cotrend_data(catalog)
+        # cotrend the data using either the LS or MAP methods
+        if config['cotrend']['cbv_mode'] == 'MAP':
+            # cotrend the data using the MAP method
+            cbvs.cotrend_data_map(catalog)
+        else:
+            cbvs.cotrend_data_ls()
         # pickle the intermediate CBVs object incase it crashes later
         cuts.picklify(cbv_pickle_file_output, cbvs)
 

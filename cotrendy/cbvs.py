@@ -174,7 +174,7 @@ class CBVs():
             besty = np.polyval(coeffs, self.timesteps)
             # this was original flux_wtrend - besty, which seemed wrong
             # as all the stars for CBVs were chosen as the fainest ones.
-            flattened = target.flux_wtrend / besty
+            flattened = target.flux_wtrend - besty
             sigma_y.append(np.std(flattened))
         sigma_y = np.array(sigma_y)
         delta_y = np.array(delta_y)
@@ -514,7 +514,7 @@ class CBVs():
             self.theta[j] = np.linspace(min(self.fit_coeffs[j])-0.10*theta_range,
                                         max(self.fit_coeffs[j])+0.10*theta_range, 2500)
 
-    def cotrend_data(self, catalog):
+    def cotrend_data_map(self, catalog):
         """
         Take the CBVs, generate MAP PDFs and
         determine the best fitting values
@@ -574,6 +574,27 @@ class CBVs():
 
         # pickle the mapp_store for analysis later
         cuts.picklify(f"{self.direc}/map.pkl", mapp_store)
+
+        # finally cotrend the lightcurves
+        self.cotrending_flux_array = np.array(cotrending_flux_array)
+        self.cotrended_flux_array = self.norm_flux_array - self.cotrending_flux_array
+
+    def cotrend_data_ls(self):
+        """
+        Directly fit the CBVs to the data and ignore prior information
+
+        This is the simpler approach while the kinks in MAP are worked out
+        """
+        cotrending_flux_array = []
+
+        for target_id in np.arange(0, len(self.norm_flux_array)):
+            correction_to_apply = []
+            for cbv_id in sorted(self.cbvs):
+                component = self.cbvs[cbv_id]*self.fit_coeffs[cbv_id][target_id]
+                correction_to_apply.append(component)
+
+            correction_to_apply = np.sum(np.array(correction_to_apply), axis=0)
+            cotrending_flux_array.append(correction_to_apply)
 
         # finally cotrend the lightcurves
         self.cotrending_flux_array = np.array(cotrending_flux_array)
