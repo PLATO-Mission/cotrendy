@@ -588,6 +588,7 @@ class CBVs():
         cotrending_flux_array = []
 
         for target_id in np.arange(0, len(self.norm_flux_array)):
+            print(f"Cotrending {target_id}/{len(self.norm_flux_array)}...")
             correction_to_apply = []
             for cbv_id in sorted(self.cbvs):
                 component = self.cbvs[cbv_id]*self.fit_coeffs[cbv_id][target_id]
