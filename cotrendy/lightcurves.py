@@ -6,7 +6,7 @@ import numpy as np
 from scipy.stats import median_absolute_deviation
 import cotrendy.utils as cuts
 
-def load_photometry(config):
+def load_photometry(config, apply_mask=True):
     """
     Read in a photometry file
     """
@@ -30,6 +30,14 @@ def load_photometry(config):
 
     if fluxes.shape != errors.shape or len(times) != len(fluxes[0]):
         print("Data arrays have mismatched shapes...")
+
+    # now apply the mask if needed
+    if apply_mask:
+        objects_mask_file = config['data']['object_mask_file']
+        mask = cuts.depicklify(f"{root}/{objects_mask_file}")
+        fluxes = fluxes[mask]
+        errors = errors[mask]
+        times = times[mask]
 
     # now make list of Lightcurves objects
     lightcurves = []

@@ -4,7 +4,6 @@ Catalog components for Cotrendy
 import sys
 import traceback
 import numpy as np
-from astropy.io import fits
 import cotrendy.utils as cuts
 
 # pylint: disable=no-member
@@ -15,7 +14,7 @@ class Catalog():
     """
     External information on the targets to detrend
     """
-    def __init__(self, config):
+    def __init__(self, config, apply_mask=True):
         """
         Initialise the class
 
@@ -33,9 +32,10 @@ class Catalog():
         self.ra = None
         self.dec = None
         self.mag = None
-        self.load_catalog(config)
+        self.ids = None
+        self.load_catalog(config, apply_mask)
 
-    def load_catalog(self, cfg):
+    def load_catalog(self, cfg, apply_mask):
         """
         Load the RA, Dec and Gaia G mag from the input catalog
         """
@@ -51,6 +51,17 @@ class Catalog():
         ra = cat[0]
         dec = cat[1]
         mag = cat[2]
+        ids = cat[3]
+
+        # mask the catalog if required
+        if apply_mask:
+            objects_mask_file = cfg['data']['objects_mask_file']
+            mask_file = f"{path}/{objects_mask_file}"
+            mask = cuts.depicklify(mask_file)
+            ra = ra[mask]
+            dec = dec[mask]
+            mag = mag[mask]
+            ids = ids[mask]
 
         # check if RA spans 0h
         min_ra = np.min(ra)
@@ -63,3 +74,4 @@ class Catalog():
         self.ra = ra
         self.dec = dec
         self.mag = mag
+        self.ids = ids

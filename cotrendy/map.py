@@ -56,9 +56,15 @@ class MAP():
         self.prior_pdf_weights = np.arange(1, 15)
 
         # make a mask to exclude the current tus
-        # no masking actually occurs if tus is not an SVD star
-        mask = np.where(cbvs.cbv_mask != tus_id)[0]
-        self.prior_mask = cbvs.cbv_mask[mask]
+        # if there is a cbv mask we check this object is not in there
+        if cbvs.cbv_mask is not None:
+            mask = np.where(cbvs.cbv_mask != tus_id)[0]
+            self.prior_mask = cbvs.cbv_mask[mask]
+        # otherwise we make a new mask for all star IDs and then exclude this object
+        else:
+            mask_ids = np.arange(len(cbvs.norm_flux_array))
+            mask = np.where(mask_ids != tus_id)[0]
+            self.prior_mask = mask
 
         # calculate the PDFs
         self.calculate_prior_pdfs(catalog, cbvs)

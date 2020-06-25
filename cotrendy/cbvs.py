@@ -153,7 +153,7 @@ class CBVs():
         self.norm_flux_array = np.array(norm_flux_array)
         self.norm_fluxerr_array = np.array(norm_fluxerr_array)
 
-    def _calculate_normalised_variability(self):
+    def calculate_normalised_variability(self):
         """
         First apply a filter to remove variable stars
 
@@ -200,7 +200,7 @@ class CBVs():
         plt.close()
         gc.collect()
 
-    def _calculate_pearson_correlation(self):
+    def calculate_pearson_correlation(self):
         """
         Take the array of targets and find the most correlated
 
@@ -284,7 +284,7 @@ class CBVs():
         dither = np.random.normal(loc=0.0, scale=0.001, size=n_light_curves)
         self.norm_flux_dithered_array = self.norm_flux_array + dither.reshape(n_light_curves, 1)
 
-    def _calculate_svd(self, cbv_pass):
+    def calculate_svd(self, cbv_pass):
         """
         Take the previously filtered flux array and calculate the SVD
 
@@ -296,15 +296,15 @@ class CBVs():
         # to return us the CBVs in order
         # NOTE we only need to work out variability, correlation and zero dither once
         if cbv_pass == 0:
-            self._calculate_normalised_variability()
-            self._calculate_pearson_correlation()
+            self.calculate_normalised_variability()
+            self.calculate_pearson_correlation()
             self._apply_zero_mean_dither()
         self._mask_stars_for_cbvs()
         print("Calculating SVD...")
         self.U, self.s, self.VT = svd(self.norm_flux_dithered_array[self.cbv_mask].T)
         print(f"Matrix shapes -  U: {self.U.shape}, s: {self.s.shape}, VT: {self.VT.shape}")
 
-    def _calculate_cbv_snr(self):
+    def calculate_cbv_snr(self):
         """
         Kepler implements as check on the SNR for each
         CBV. If the SNR (dB) is < 5dB, they are removed.
@@ -341,12 +341,12 @@ class CBVs():
         # loop until there are no more dominating stars
         while n_dominating != 0:
             print(f"Starting CBV pass {cbv_pass}...")
-            self._calculate_svd(cbv_pass)
+            self.calculate_svd(cbv_pass)
             for i in range(self.max_n_cbvs):
                 self.cbvs[i] = self.U[:, i]
 
             # check they have sufficient SNR
-            self._calculate_cbv_snr()
+            self.calculate_cbv_snr()
             n_dominating = self._check_for_dominating_stars(cbv_pass)
             cbv_pass += 1
 
@@ -514,7 +514,7 @@ class CBVs():
             self.theta[j] = np.linspace(min(self.fit_coeffs[j])-0.10*theta_range,
                                         max(self.fit_coeffs[j])+0.10*theta_range, 2500)
 
-    def cotrend_data_map(self, catalog):
+    def cotrend_data_map(self, catalog, store_map=True):
         """
         Take the CBVs, generate MAP PDFs and
         determine the best fitting values
@@ -522,7 +522,6 @@ class CBVs():
         """
         cotrending_flux_array = []
         mapp_store = []
-        fail_store = []
 
         for target_id in np.arange(0, len(self.norm_flux_array)):
             print(f"Cotrending {target_id}/{len(self.norm_flux_array)}...")
@@ -535,8 +534,8 @@ class CBVs():
                 print("MAP failed, skipping...")
                 n_data_points = len(self.norm_flux_array[0])
                 cotrending_flux_array.append(np.zeros(n_data_points))
-                fail_store.append(target_id)
-                mapp_store.append(None)
+                if store_map:
+                    mapp_store.append(None)
                 continue
 
             # make plots for the test stars
@@ -544,10 +543,6 @@ class CBVs():
                 mapp.plot_prior_pdf(self)
                 mapp.plot_conditional_pdf(self)
                 mapp.plot_posterior_pdf(self)
-
-            # keep track of number of failures
-            if not mapp.all_max_success:
-                fail_store.append(target_id)
 
             # work out very crudely if we want to use the prior or not
             # then detrend the lightcurve and store the results
@@ -576,10 +571,12 @@ class CBVs():
             cotrending_flux_array.append(correction_to_apply)
 
             # store the mapp objects for debugging
-            mapp_store.append(mapp)
+            if store_map:
+                mapp_store.append(mapp)
 
         # pickle the mapp_store for analysis later
-        cuts.picklify(f"{self.direc}/map.pkl", mapp_store)
+        if store_map:
+            cuts.picklify(f"{self.direc}/map.pkl", mapp_store)
 
         # finally cotrend the lightcurves
         self.cotrending_flux_array = np.array(cotrending_flux_array)
