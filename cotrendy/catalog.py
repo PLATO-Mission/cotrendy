@@ -41,7 +41,7 @@ class Catalog():
         """
         try:
             path = cfg['global']['root']
-            filename = cfg['catalog']['cbv_cat_file']
+            filename = cfg['catalog']['input_cat_file']
         except Exception:
             print("Missing catalog info from configuration file")
             traceback.print_exc(file=sys.stdout)
