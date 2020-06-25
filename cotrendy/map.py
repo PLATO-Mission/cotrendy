@@ -21,7 +21,7 @@ class MAP():
 
     PDFs and parameters are indexed by CBV_id
     """
-    def __init__(self, catalog, cbvs, tus_id, direc):
+    def __init__(self, catalog, cbvs, tus_id, direc, do_posterior=False):
         """
         Initialise the MAP class
         """
@@ -69,18 +69,23 @@ class MAP():
         # calculate the PDFs
         self.calculate_prior_pdfs(catalog, cbvs)
         self.calculate_conditional_pdfs(cbvs)
-        self.calculate_posterior_pdfs(cbvs)
 
-        # take some notes on the success of maximising the PDFs
-        self.all_max_success = False
-        failures = 0
-        # check if any maximising failed
-        for cbv_id in cbvs.cbvs.keys():
-            if not self.prior_max_success[cbv_id] or not self.cond_max_success[cbv_id] or not \
-                self.posterior_max_success[cbv_id]:
-                failures += 1
-        if failures == 0:
-            self.all_max_success = True
+        # initial tests are either using the conditional
+        # or the prior, we need to solve the weighting issue
+        # to finally use the posterior
+        if do_posterior:
+            self.calculate_posterior_pdfs(cbvs)
+
+            # take some notes on the success of maximising the PDFs
+            self.all_max_success = False
+            failures = 0
+            # check if any maximising failed
+            for cbv_id in cbvs.cbvs.keys():
+                if not self.prior_max_success[cbv_id] or not self.cond_max_success[cbv_id] or not \
+                    self.posterior_max_success[cbv_id]:
+                    failures += 1
+            if failures == 0:
+                self.all_max_success = True
 
     def calculate_prior_pdfs(self, catalog, cbvs):
         """
