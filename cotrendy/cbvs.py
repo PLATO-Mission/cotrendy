@@ -557,7 +557,13 @@ class CBVs():
                 cond_peak_theta = mapp.cond_peak_theta[cbv_id]
                 prior_peak_theta = mapp.prior_peak_theta[cbv_id]
                 prior_cond_diff = abs(prior_peak_theta-cond_peak_theta)
-                if prior_cond_diff > 12*sigma:
+
+                # so for simplicity here, we do the following
+                # if the star is > variability_limit and the conditional
+                # is > 5 sigma from the prior, this indicates a bad fit
+                # use the prior. Else just use the conditional fit
+                if self.variability[target_id] > self.normalised_variability_limit and \
+                    prior_cond_diff > 5*sigma:
                     best_theta = prior_peak_theta
                 else:
                     best_theta = cond_peak_theta

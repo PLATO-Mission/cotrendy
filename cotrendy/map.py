@@ -103,12 +103,12 @@ class MAP():
         self.distances = distances
 
         # here we work out which stars are closest in distance
-        # we find those below some cut (say 20%) and then
+        # we find those below some cut (say 10%) and then
         # take the stddev of the fit coeffs of those stars, then use this
         # stddev to snap the prior to the conditional if the prior is within
         # some sigma of the conditional
         ds = np.copy(distances)
-        obj_id_at_limit = int(len(distances)*0.2)
+        obj_id_at_limit = int(len(distances)*0.1)
         ds.sort()
         distance_limit_for_sigma = ds[obj_id_at_limit]
 
@@ -278,8 +278,8 @@ class MAP():
             # draw a vertical line for the max of each PDF
             _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--')
             _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--')
-            _ = ax.axvline(min(self.posterior_peak_theta[i]), color='green', ls='--')
-            _ = ax.axvline(max(self.posterior_peak_theta[i]), color='green', ls='--')
+            #_ = ax.axvline(min(self.posterior_peak_theta[i]), color='green', ls='--')
+            #_ = ax.axvline(max(self.posterior_peak_theta[i]), color='green', ls='--')
             label = f"Theta PDFw ({self.prior_peak_theta[i]:.4f})"
             _ = ax.plot(cbvs.theta[i], self.prior_pdf[i], 'r-',
                         label=label)
@@ -305,8 +305,8 @@ class MAP():
             # draw a vertical line for the max of each PDF
             _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--')
             _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--')
-            _ = ax.axvline(min(self.posterior_peak_theta[i]), color='green', ls='--')
-            _ = ax.axvline(max(self.posterior_peak_theta[i]), color='green', ls='--')
+            #_ = ax.axvline(min(self.posterior_peak_theta[i]), color='green', ls='--')
+            #_ = ax.axvline(max(self.posterior_peak_theta[i]), color='green', ls='--')
             label = f"Cond ({self.cond_peak_theta[i]:.4f})"
             _ = ax.plot(cbvs.theta[i], self.cond_pdf[i], 'k-',
                         label=label)
@@ -335,8 +335,8 @@ class MAP():
             # draw a vertical line for the max of each PDF
             _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--')
             _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--')
-            _ = ax.axvline(min(self.posterior_peak_theta[i]), color='green', ls='--')
-            _ = ax.axvline(max(self.posterior_peak_theta[i]), color='green', ls='--')
+            #_ = ax.axvline(min(self.posterior_peak_theta[i]), color='green', ls='--')
+            #_ = ax.axvline(max(self.posterior_peak_theta[i]), color='green', ls='--')
             #_ = ax.set_xlabel('Theta')
             #_ = ax.set_ylabel('Arbitrary units')
             #_ = ax.legend()

@@ -2,5 +2,5 @@ global-exclude *.pyc *.o
 include README.md
 
 include setup.cfg
-include trendy_version.py
+include cotrendy_version.py
 
