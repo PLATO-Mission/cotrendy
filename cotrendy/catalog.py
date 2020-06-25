@@ -5,7 +5,7 @@ import sys
 import traceback
 import numpy as np
 from astropy.io import fits
-import cotrend.utils as cuts
+import cotrendy.utils as cuts
 
 # pylint: disable=no-member
 # pylint: disable=broad-except
