@@ -33,7 +33,7 @@ def load_photometry(config, apply_mask=True):
 
     # now apply the mask if needed
     if apply_mask:
-        objects_mask_file = config['data']['object_mask_file']
+        objects_mask_file = config['data']['objects_mask_file']
         mask = cuts.depicklify(f"{root}/{objects_mask_file}")
         fluxes = fluxes[mask]
         errors = errors[mask]
