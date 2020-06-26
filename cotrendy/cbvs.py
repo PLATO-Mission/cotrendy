@@ -643,7 +643,7 @@ def worker_fn(star_id, constants):
     catalog, cbvs = constants
 
     try:
-        mapp = MAP(catalog, cbvs, star_id, direc)
+        mapp = MAP(catalog, cbvs, star_id)
     except Exception:
         # return the star_id and all zeros for the correction
         # if the mapp processing fails
