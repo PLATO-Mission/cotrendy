@@ -640,7 +640,7 @@ def worker_fn(star_id, constants):
     and the star_id as a changing variable to select the
     right parts of the constant data to perform the cotrending
     """
-    catalog, cbvs, direc = constants
+    catalog, cbvs = constants
 
     try:
         mapp = MAP(catalog, cbvs, star_id, direc)
