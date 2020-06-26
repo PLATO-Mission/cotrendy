@@ -4,7 +4,7 @@ Example layout of using Cotrendy
 import gc
 import argparse as ap
 import matplotlib
-matplotlib.use('QT5Agg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import cotrendy.utils as cuts
 import cotrendy.lightcurves as tlc

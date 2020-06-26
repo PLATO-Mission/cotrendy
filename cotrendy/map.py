@@ -7,7 +7,7 @@ import numpy as np
 from scipy.stats import gaussian_kde
 from scipy.integrate import simps
 import matplotlib
-matplotlib.use('QT5Agg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 # pylint: disable=invalid-name

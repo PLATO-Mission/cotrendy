@@ -12,7 +12,7 @@ from scipy.stats import pearsonr
 from scipy.linalg import svd
 import scipy.optimize as optimization
 import matplotlib
-matplotlib.use('QT5Agg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from cotrendy.map import MAP
