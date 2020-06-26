@@ -68,11 +68,12 @@ test_stars = [10,100,1000]
 
 The bayesian maximum a posteriori (MAP) method of cotrending requires supplimentary information about the target under study and its neighbours. This is supplied as a catalog of information (currently, RA, Dec, Magnitude).
 
-   1. The location of the input catalog is given in the configuration file under ```{global.root}/{catalog.cat_file}```
-   1. Supported formats are fits and text inputs
-   1. The catalog is assumed to contain 3 colums, Ra, Dec and Mag in that order
-   1. If a text file is supplied it should be space separated columns
-   1. If a fits file is supplied the fits table should be in the first fits extension and the column headers must be 'ra', 'dec' and 'mag'
+   1. The location of the input catalog is given in the configuration file under ```{global.root}/{catalog.input_cat_file}```
+   1. The catalog should be a pickled numpy array with 4 rows:
+      1. Ra
+      1. Dec
+      1. Mag
+      1. Id
 
 ### Photometry
 
@@ -97,8 +98,3 @@ picklify('times.pkl', times)
 picklify('fluxes.pkl', fluxes)
 picklify('errors.pkl', errors)
 ```
-
-I have made a couple of functions in ```cotrendy.INSTRUMENT_NAME``` to help prepare the data in the correct formats.
-There are functions currently available for:
-
-   1. NGTS QLP
