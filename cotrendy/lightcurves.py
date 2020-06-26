@@ -37,7 +37,7 @@ def load_photometry(config, apply_mask=True):
         mask = cuts.depicklify(f"{root}/{objects_mask_file}")
         fluxes = fluxes[mask]
         errors = errors[mask]
-        times = times[mask]
+        times = times
 
     # now make list of Lightcurves objects
     lightcurves = []
