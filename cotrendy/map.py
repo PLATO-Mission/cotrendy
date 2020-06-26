@@ -21,7 +21,7 @@ class MAP():
 
     PDFs and parameters are indexed by CBV_id
     """
-    def __init__(self, catalog, cbvs, tus_id, direc, do_posterior=False):
+    def __init__(self, catalog, cbvs, tus_id, do_posterior=False):
         """
         Initialise the MAP class
 
@@ -34,15 +34,12 @@ class MAP():
             Contains information about the basis vectors
         tus_id : int
             Current target index being analysed
-        direc : string
-            Current working directory
-            Used for outputting plots etc
         do_posterior : boolean
             Temporary flag to turn of posterior PDF generation
             while the kinks in a full MAP process are worked out
         """
         self.tus_id = tus_id
-        self.direc = direc
+        self.direc = cbvs.direc
 
         # prior PDF
         self.distances = None
@@ -96,7 +93,7 @@ class MAP():
             self.all_max_success = False
             failures = 0
             # check if any maximising failed
-            for cbv_id in cbvs.cbvs.keys():
+            for cbv_id in sorted(cbvs.cbvs.keys()):
                 if not self.prior_max_success[cbv_id] or not self.cond_max_success[cbv_id] or not \
                     self.posterior_max_success[cbv_id]:
                     failures += 1
@@ -170,12 +167,12 @@ class MAP():
             # check if maximising failed
             if peak_theta is None or peak_pdf is None:
                 self.prior_max_success[cbv_id] = False
+                self.prior_peak_theta[cbv_id] = 0.0
+                self.prior_peak_pdf[cbv_id] = 0.0
             else:
                 self.prior_max_success[cbv_id] = True
-
-            # store the values for later use
-            self.prior_peak_theta[cbv_id] = peak_theta
-            self.prior_peak_pdf[cbv_id] = peak_pdf
+                self.prior_peak_theta[cbv_id] = peak_theta
+                self.prior_peak_pdf[cbv_id] = peak_pdf
 
             # calculate the integral of the weighted PDF, it should be close to 1
             dx = cbvs.theta[cbv_id][1] - cbvs.theta[cbv_id][0]
@@ -227,16 +224,15 @@ class MAP():
             # check if maximising failed
             if peak_theta is None or peak_pdf is None:
                 self.cond_max_success[cbv_id] = False
-                correction_factor = 0
+                self.cond_peak_theta[cbv_id] = 0.0
+                self.cond_peak_pdf[cbv_id] = 0.0
             else:
                 self.cond_max_success[cbv_id] = True
-                correction_factor = peak_theta
-
-            self.cond_peak_theta[cbv_id] = peak_theta
-            self.cond_peak_pdf[cbv_id] = peak_pdf
+                self.cond_peak_theta[cbv_id] = peak_theta
+                self.cond_peak_pdf[cbv_id] = peak_pdf
 
             # update the data and sigma for the next round
-            data = data - (cbvs.cbvs[cbv_id] * correction_factor)
+            data = data - (cbvs.cbvs[cbv_id] * self.cond_peak_theta[cbv_id])
             sigma = np.std(data)
 
     # TODO: implement correct weighting scheme for prior PDF
@@ -271,12 +267,12 @@ class MAP():
 
                 if peak_theta is None or peak_pdf is None:
                     self.posterior_max_success[cbv_id].append(False)
+                    self.posterior_peak_theta[cbv_id].append(0.0)
+                    self.posterior_peak_pdf[cbv_id].append(0.0)
                 else:
                     self.posterior_max_success[cbv_id].append(True)
-
-                # store the peak etc for this weight
-                self.posterior_peak_theta[cbv_id].append(peak_theta)
-                self.posterior_peak_pdf[cbv_id].append(peak_pdf)
+                    self.posterior_peak_theta[cbv_id].append(peak_theta)
+                    self.posterior_peak_pdf[cbv_id].append(peak_pdf)
 
     def _maximise_pdf(self, theta, pdf, pdf_type):
         """

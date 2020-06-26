@@ -4,6 +4,8 @@ Cotrending Basis Vectors compoents for Cotrendy
 import gc
 import sys
 import traceback
+from functools import partial
+from multiprocessing import Pool
 from collections import defaultdict
 import numpy as np
 from scipy.stats import pearsonr
@@ -13,7 +15,6 @@ import matplotlib
 matplotlib.use('QT5Agg')
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-import cotrendy.utils as cuts
 from cotrendy.map import MAP
 
 # pylint: disable=invalid-name
@@ -514,72 +515,32 @@ class CBVs():
             self.theta[j] = np.linspace(min(self.fit_coeffs[j])-0.10*theta_range,
                                         max(self.fit_coeffs[j])+0.10*theta_range, 2500)
 
-    def cotrend_data_map(self, catalog, store_map=True):
+    def cotrend_data_map_mp(self, catalog):
         """
-        Take the CBVs, generate MAP PDFs and
-        determine the best fitting values
-        then scale and correct the lightcurves
+        Use multiprocessing to speed up the cotrending of many lcs
         """
-        cotrending_flux_array = []
-        mapp_store = []
+        target_ids = np.arange(0, len(self.norm_flux_array))
+        n_data_points = len(self.norm_flux_array[0])
 
-        for target_id in np.arange(0, len(self.norm_flux_array)):
-            print(f"Cotrending {target_id}/{len(self.norm_flux_array)}...")
-            # generate a MAP object
-            # this generates the prior, conditional and posterior pdfs
-            try:
-                mapp = MAP(catalog, self, target_id, self.direc)
-            except Exception:
-                traceback.print_exc(file=sys.stdout)
-                print("MAP failed, skipping...")
-                n_data_points = len(self.norm_flux_array[0])
-                cotrending_flux_array.append(np.zeros(n_data_points))
-                if store_map:
-                    mapp_store.append(None)
-                continue
+        # make an empty array for holding the correction
+        correction = np.empty((len(target_ids), n_data_points))
 
-            # make plots for the test stars
-            if target_id in self.test_stars:
-                mapp.plot_prior_pdf(self)
-                mapp.plot_conditional_pdf(self)
-                mapp.plot_posterior_pdf(self)
+        # collect together constants for giving to pool
+        const = (catalog, self)
 
-            # work out very crudely if we want to use the prior or not
-            # then detrend the lightcurve and store the results
-            correction_to_apply = []
-            for cbv_id in sorted(self.cbvs):
-                sigma = mapp.prior_sigma[cbv_id]
-                cond_peak_theta = mapp.cond_peak_theta[cbv_id]
-                prior_peak_theta = mapp.prior_peak_theta[cbv_id]
-                prior_cond_diff = abs(prior_peak_theta-cond_peak_theta)
+        # make a partial function with the constants baked in
+        fn = partial(worker_fn, constants=const)
 
-                # so for simplicity here, we do the following
-                # if the star is > variability_limit and the conditional
-                # is > 5 sigma from the prior, this indicates a bad fit
-                # use the prior. Else just use the conditional fit
-                if self.variability[target_id] > self.normalised_variability_limit and \
-                    prior_cond_diff > 5*sigma:
-                    best_theta = prior_peak_theta
-                else:
-                    best_theta = cond_peak_theta
+        # run a pool of 6 workers and set them detrending
+        with Pool(6) as pool:
+            results = pool.map(fn, target_ids)
 
-                component = self.cbvs[cbv_id]*best_theta
-                correction_to_apply.append(component)
-
-            # sum up the scaled CBVs then do the correction
-            correction_to_apply = np.sum(np.array(correction_to_apply), axis=0)
-            cotrending_flux_array.append(correction_to_apply)
-
-            # store the mapp objects for debugging
-            if store_map:
-                mapp_store.append(mapp)
-
-        # pickle the mapp_store for analysis later
-        if store_map:
-            cuts.picklify(f"{self.direc}/map.pkl", mapp_store)
+        # collect the results and make a correction array
+        for r, c in results:
+            correction[r] = c
 
         # finally cotrend the lightcurves
-        self.cotrending_flux_array = np.array(cotrending_flux_array)
+        self.cotrending_flux_array = correction
         self.cotrended_flux_array = self.norm_flux_array - self.cotrending_flux_array
 
     def cotrend_data_ls(self):
@@ -603,3 +564,122 @@ class CBVs():
         # finally cotrend the lightcurves
         self.cotrending_flux_array = np.array(cotrending_flux_array)
         self.cotrended_flux_array = self.norm_flux_array - self.cotrending_flux_array
+
+    #def cotrend_data_map(self, catalog, store_map=True):
+    #    """
+    #    Take the CBVs, generate MAP PDFs and
+    #    determine the best fitting values
+    #    then scale and correct the lightcurves
+    #    """
+    #    cotrending_flux_array = []
+    #    mapp_store = []
+    #
+    #    for target_id in np.arange(0, len(self.norm_flux_array)):
+    #        print(f"Cotrending {target_id}/{len(self.norm_flux_array)}...")
+    #        # generate a MAP object
+    #        # this generates the prior, conditional and posterior pdfs
+    #        try:
+    #            mapp = MAP(catalog, self, target_id)
+    #        except Exception:
+    #            traceback.print_exc(file=sys.stdout)
+    #            print("MAP failed, skipping...")
+    #            n_data_points = len(self.norm_flux_array[0])
+    #            cotrending_flux_array.append(np.zeros(n_data_points))
+    #            if store_map:
+    #                mapp_store.append(None)
+    #            continue
+    #
+    #        # make plots for the test stars
+    #        if target_id in self.test_stars:
+    #            mapp.plot_prior_pdf(self)
+    #            mapp.plot_conditional_pdf(self)
+    #            mapp.plot_posterior_pdf(self)
+    #
+    #        # work out very crudely if we want to use the prior or not
+    #        # then detrend the lightcurve and store the results
+    #        correction_to_apply = []
+    #        for cbv_id in sorted(self.cbvs):
+    #            sigma = mapp.prior_sigma[cbv_id]
+    #            cond_peak_theta = mapp.cond_peak_theta[cbv_id]
+    #            prior_peak_theta = mapp.prior_peak_theta[cbv_id]
+    #            prior_cond_diff = abs(prior_peak_theta-cond_peak_theta)
+    #
+    #            # so for simplicity here, we do the following
+    #            # if the star is > variability_limit and the conditional
+    #            # is > 5 sigma from the prior, this indicates a bad fit
+    #            # use the prior. Else just use the conditional fit
+    #            if self.variability[target_id] > self.normalised_variability_limit and \
+    #                prior_cond_diff > 5*sigma:
+    #                best_theta = prior_peak_theta
+    #            else:
+    #                best_theta = cond_peak_theta
+    #
+    #            component = self.cbvs[cbv_id]*best_theta
+    #            correction_to_apply.append(component)
+    #
+    #        # sum up the scaled CBVs then do the correction
+    #        correction_to_apply = np.sum(np.array(correction_to_apply), axis=0)
+    #        cotrending_flux_array.append(correction_to_apply)
+    #
+    #        # store the mapp objects for debugging
+    #        if store_map:
+    #            mapp_store.append(mapp)
+    #
+    #    # pickle the mapp_store for analysis later
+    #    if store_map:
+    #        cuts.picklify(f"{self.direc}/map.pkl", mapp_store)
+    #
+    #    # finally cotrend the lightcurves
+    #    self.cotrending_flux_array = np.array(cotrending_flux_array)
+    #    self.cotrended_flux_array = self.norm_flux_array - self.cotrending_flux_array
+
+# multiprocessing worker function
+def worker_fn(star_id, constants):
+    """
+    Take in the constant items under the constants tuple
+    and the star_id as a changing variable to select the
+    right parts of the constant data to perform the cotrending
+    """
+    catalog, cbvs, direc = constants
+
+    try:
+        mapp = MAP(catalog, cbvs, star_id, direc)
+    except Exception:
+        # return the star_id and all zeros for the correction
+        # if the mapp processing fails
+        traceback.print_exc(file=sys.stdout)
+        print("MAP failed, skipping...")
+        n_data_points = len(cbvs.norm_flux_array[0])
+        return star_id, np.zeros(n_data_points)
+
+    # make plots for the test stars
+    if star_id in cbvs.test_stars:
+        mapp.plot_prior_pdf(cbvs)
+        mapp.plot_conditional_pdf(cbvs)
+        mapp.plot_posterior_pdf(cbvs)
+
+    # work out very crudely if we want to use the prior or not
+    # then detrend the lightcurve and store the results
+    correction_to_apply = []
+    for cbv_id in sorted(cbvs.cbvs.keys()):
+        sigma = mapp.prior_sigma[cbv_id]
+        cond_peak_theta = mapp.cond_peak_theta[cbv_id]
+        prior_peak_theta = mapp.prior_peak_theta[cbv_id]
+        prior_cond_diff = abs(prior_peak_theta-cond_peak_theta)
+
+        # so for simplicity here, we do the following
+        # if the star is > variability_limit and the conditional
+        # is > 5 sigma from the prior, this indicates a bad fit
+        # use the prior. Else just use the conditional fit
+        if cbvs.variability[star_id] > cbvs.normalised_variability_limit and \
+            prior_cond_diff > 5*sigma:
+            best_theta = prior_peak_theta
+        else:
+            best_theta = cond_peak_theta
+
+        component = cbvs.cbvs[cbv_id]*best_theta
+        correction_to_apply.append(component)
+
+    # sum up the scaled CBVs then do the correction
+    correction_to_apply = np.sum(np.array(correction_to_apply), axis=0)
+    return star_id, correction_to_apply
