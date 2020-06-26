@@ -9,6 +9,24 @@ import cotrendy.utils as cuts
 def load_photometry(config, apply_mask=True):
     """
     Read in a photometry file
+
+    Parameters
+    ----------
+    config : dict
+        Configuration file loaded via TOML
+    apply_mask : boolean
+        Mask our a subset of stars?
+
+    Returns
+    -------
+    times : array
+        Array of times of observation
+    lightcurves : list
+        List of Lightcurve objects, one per star
+
+    Raises
+    ------
+    None
     """
     root = config['global']['root']
     time_file = config['data']['time_file']
@@ -37,7 +55,6 @@ def load_photometry(config, apply_mask=True):
         mask = cuts.depicklify(f"{root}/{objects_mask_file}")
         fluxes = fluxes[mask]
         errors = errors[mask]
-        times = times
 
     # now make list of Lightcurves objects
     lightcurves = []
@@ -91,6 +108,23 @@ class Lightcurve():
         within a window ±beta around a given data point.
         Replace the data point with the local median
         as to not introduce gaps
+
+        Parameters
+        ----------
+        alpha : int
+            Scaling factor for number of MADs to reject outside
+        beta : int
+            Half width of sliding window for MAD rejection
+
+        Returns
+        -------
+        None
+
+        Outliers indices are included in self.outlier_indices
+
+        Raises
+        ------
+        None
         """
         # could imaging this having a voting system where each beta*2+1 slice
         # votes on an outlier and if >N votes it gets nuked

@@ -14,16 +14,32 @@ import matplotlib.pyplot as plt
 
 class MAP():
     """
-    Take a set of CBVs and use the MAP method
+    Take a set of CBVs fit coeffs and use the MAP method
     to cotrend a series of light curves.
 
-    There is a MAP CLASS FOR EACH OBJECT!
+    There is a MAP instance for each light curve
 
     PDFs and parameters are indexed by CBV_id
     """
     def __init__(self, catalog, cbvs, tus_id, direc, do_posterior=False):
         """
         Initialise the MAP class
+
+        Parameters
+        ----------
+        catalog : Catalog object
+            Contains information about the targets
+            RA, Dec, Mag and ID
+        cbvs : CBVs object
+            Contains information about the basis vectors
+        tus_id : int
+            Current target index being analysed
+        direc : string
+            Current working directory
+            Used for outputting plots etc
+        do_posterior : boolean
+            Temporary flag to turn of posterior PDF generation
+            while the kinks in a full MAP process are worked out
         """
         self.tus_id = tus_id
         self.direc = direc
@@ -94,6 +110,14 @@ class MAP():
         Taken from eqs 17 and 18 of Smith et al. 2012 Kepler PDC paper.
 
         Note: here we have ra, dec and gmag equally weighted
+
+        Parameters
+        ----------
+        catalog : Catalog object
+            Contains information about the targets
+            RA, Dec, Mag and ID
+        cbvs : CBVs object
+            Contains information about the basis vectors
         """
         lamb = np.matrix(np.diag([np.var(catalog.ra[self.prior_mask]),
                                   np.var(catalog.dec[self.prior_mask]),
@@ -163,6 +187,14 @@ class MAP():
 
     def calculate_conditional_pdfs(self, cbvs):
         """
+        Generate the conditional PDF for each CBV
+
+        This represents the direct LS fit of the CBVs to the data
+
+        Parameters
+        ----------
+        cbvs : CBVs object
+            Contains information about the basis vectors
         """
         # keep a running total of the fit residuals, starting with the data
         data = np.copy(cbvs.norm_flux_array[self.tus_id])
@@ -207,8 +239,19 @@ class MAP():
             data = data - (cbvs.cbvs[cbv_id] * correction_factor)
             sigma = np.std(data)
 
+    # TODO: implement correct weighting scheme for prior PDF
     def calculate_posterior_pdfs(self, cbvs):
         """
+        Generate the posterior PDF for each CBV
+
+        This is a combination of the conditional PDF and the weighted* prior PDF
+
+        Note: The weighting of the prior PDF is an outstanding issue
+
+        Parameters
+        ----------
+        cbvs : CBVs object
+            Contains information about the basis vectors
         """
         for cbv_id in sorted(cbvs.cbvs):
             for weight in self.prior_pdf_weights:
@@ -238,6 +281,26 @@ class MAP():
     def _maximise_pdf(self, theta, pdf, pdf_type):
         """
         Take a PDF and maximise it to find the best fitting coefficient
+
+        Parameters
+        ----------
+        theta : array
+            Array of fit coefficients
+        pdf : array
+            Probability of each fit coeff in theta
+        pdf_type : string
+            Type of PDF being maximised
+
+        Returns
+        -------
+        theta_peak : float
+            Theta value at max of PDF
+        pdf_peak : float
+            PDF value at max
+
+        Raises
+        ------
+        None
         """
         # find the maximum of the PDF then perform a quadratic fit
         # of the 3 values surrounding the maximum to find the best
@@ -260,7 +323,25 @@ class MAP():
 
     @staticmethod
     def _kde_scipy(x, x_grid, weights=None):
-        """Kernel Density Estimation with Scipy"""
+        """
+        Kernel Density Estimation with Scipy
+
+        Parameters
+        ----------
+        x : array
+            Array of values for generate PDF
+        x_grid : array
+            Array of value to evaluate PDF over
+
+        Returns
+        -------
+        pdf : array
+            PDF of values in x
+
+        Raises
+        ------
+        None
+        """
         # Note that scipy weights its bandwidth by the covariance of the
         # input data.  To make the results comparable to the other methods,
         # we divide the bandwidth by the sample standard deviation here.
@@ -276,6 +357,11 @@ class MAP():
 
         Call this function with the same coeffs used to generate the
         weighted prior PDF otherwise it doesn't make sense
+
+        Parameters
+        ----------
+        cbvs : CBVs object
+            Contains information about the basis vectors
         """
         fig, axar = plt.subplots(len(cbvs.cbvs.keys()), figsize=(10, 10))
 
@@ -307,6 +393,11 @@ class MAP():
     def plot_conditional_pdf(self, cbvs):
         """
         Plot the conditional PDF and overplot the maximum
+
+        Parameters
+        ----------
+        cbvs : CBVs object
+            Contains information about the basis vectors
         """
         fig, axar = plt.subplots(len(cbvs.cbvs.keys()), figsize=(10, 10))
         if len(cbvs.cbvs.keys()) == 1:
@@ -334,6 +425,11 @@ class MAP():
     def plot_posterior_pdf(self, cbvs):
         """
         Plot the posterior PDF
+
+        Parameters
+        ----------
+        cbvs : CBVs object
+            Contains information about the basis vectors
         """
         fig, axar = plt.subplots(len(cbvs.cbvs.keys()), figsize=(10, 10))
         if len(cbvs.cbvs.keys()) == 1:
