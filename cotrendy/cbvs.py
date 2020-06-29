@@ -4,6 +4,7 @@ Cotrending Basis Vectors compoents for Cotrendy
 import gc
 import sys
 import traceback
+from datetime import datetime
 from functools import partial
 from multiprocessing import Pool
 from collections import defaultdict
@@ -88,6 +89,9 @@ class CBVs():
         self.timesteps = timesteps
         self.targets = targets
         self.lc_idx = np.arange(0, len(targets))
+
+        # multiprocessing pool size
+        self.pool_size = config['cotrend']['pool_size']
 
         # shortlist of stars to analyse more closely
         self.test_stars = config['cotrend']['test_stars']
@@ -532,7 +536,7 @@ class CBVs():
         fn = partial(worker_fn, constants=const)
 
         # run a pool of 6 workers and set them detrending
-        with Pool(6) as pool:
+        with Pool(self.pool_size) as pool:
             results = pool.map(fn, target_ids)
 
         # collect the results and make a correction array
@@ -640,6 +644,10 @@ def worker_fn(star_id, constants):
     and the star_id as a changing variable to select the
     right parts of the constant data to perform the cotrending
     """
+    # get the time the function started to check concurrency
+    start = datetime.utcnow()
+
+    # unpack constants
     catalog, cbvs = constants
 
     try:
@@ -682,4 +690,10 @@ def worker_fn(star_id, constants):
 
     # sum up the scaled CBVs then do the correction
     correction_to_apply = np.sum(np.array(correction_to_apply), axis=0)
+
+    # check the run time for this star
+    end = datetime.utcnow()
+    diff_time = (end - start).seconds
+    print(f"[{star_id}] Started: {start} - Finished: {end} - Runtime: {diff_time} sec")
+
     return star_id, correction_to_apply
