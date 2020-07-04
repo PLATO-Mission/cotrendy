@@ -679,7 +679,7 @@ def worker_fn(star_id, constants):
         # if the star is > variability_limit and the conditional
         # is > 5 sigma from the prior, this indicates a bad fit
         # use the prior. Else just use the conditional fit
-        if cbvs.variability[star_id] > cbvs.normalised_variability_limit and \
+        if cbvs.variability[star_id] > 3*cbvs.normalised_variability_limit and \
             prior_cond_diff > 5*sigma:
             best_theta = prior_peak_theta
         else:
