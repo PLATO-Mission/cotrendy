@@ -309,12 +309,12 @@ class CBVs():
         self.U, self.s, self.VT = svd(self.norm_flux_dithered_array[self.cbv_mask].T)
         print(f"Matrix shapes -  U: {self.U.shape}, s: {self.s.shape}, VT: {self.VT.shape}")
 
-        # plot the singular values against their index
+        # plot the first 50 singular values against their index
         output_filename = f"{self.direc}/singular_values.png"
         fig, ax = plt.subplots(1, figsize=(10, 10))
-        inds = np.arange(len(self.s))
-        ax.loglog(inds+1, self.s, 'ko')
-        ax.loglog(inds+1, self.s, 'k-')
+        inds = np.arange(1, 51)
+        ax.loglog(inds, self.s[:50], 'ko')
+        ax.loglog(inds, self.s[:50], 'k-')
         ax.set_xlabel('Singular value index [1]')
         ax.set_ylabel('Singular vale')
         fig.tight_layout()
