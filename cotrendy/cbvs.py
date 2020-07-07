@@ -311,7 +311,7 @@ class CBVs():
 
         # plot the first 50 singular values against their index
         output_filename = f"{self.direc}/singular_values.png"
-        fig, ax = plt.subplots(1, figsize=(10, 10))
+        fig, ax = plt.subplots(1, figsize=(5, 5))
         inds = np.arange(1, 51)
         ax.loglog(inds, self.s[:50], 'ko')
         ax.loglog(inds, self.s[:50], 'k-')
