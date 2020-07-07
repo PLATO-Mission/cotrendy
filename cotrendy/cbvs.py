@@ -309,6 +309,20 @@ class CBVs():
         self.U, self.s, self.VT = svd(self.norm_flux_dithered_array[self.cbv_mask].T)
         print(f"Matrix shapes -  U: {self.U.shape}, s: {self.s.shape}, VT: {self.VT.shape}")
 
+        # plot the singular values against their index
+        output_filename = f"{self.direc}/singular_values.png"
+        fig, ax = plt.subplots(1, figsize=(10, 10))
+        inds = np.arange(len(self.s))
+        ax[0].loglog(inds+1, self.s, 'ko')
+        ax[0].loglog(inds+1, self.s, 'k-')
+        ax[0].set_xlabel('Singular value index [1]')
+        ax[0].set_ylabel('Singular vale')
+        fig.tight_layout()
+        fig.savefig(output_filename)
+        fig.clf()
+        plt.close()
+        gc.collect()
+
     def calculate_cbv_snr(self):
         """
         Kepler implements as check on the SNR for each
