@@ -315,7 +315,7 @@ class CBVs():
         inds = np.arange(1, 51)
         ax.loglog(inds, self.s[:50], 'ko')
         ax.loglog(inds, self.s[:50], 'k-')
-        ax.set_xlabel('Singular value index [1]')
+        ax.set_xlabel('Singular value index')
         ax.set_ylabel('Singular vale')
         fig.tight_layout()
         fig.savefig(output_filename)
@@ -710,4 +710,4 @@ def worker_fn(star_id, constants):
     diff_time = (end - start).seconds
     print(f"[{star_id}] Started: {start} - Finished: {end} - Runtime: {diff_time} sec")
 
-    return star_id, correction_to_apply
+    eleturn star_id, correction_to_apply
