@@ -710,4 +710,4 @@ def worker_fn(star_id, constants):
     diff_time = (end - start).seconds
     print(f"[{star_id}] Started: {start} - Finished: {end} - Runtime: {diff_time} sec")
 
-    eleturn star_id, correction_to_apply
+    return star_id, correction_to_apply
