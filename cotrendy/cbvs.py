@@ -12,6 +12,7 @@ import numpy as np
 from scipy.stats import pearsonr
 from scipy.linalg import svd
 import scipy.optimize as optimization
+from scipy.stats import median_absolute_deviation
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -545,30 +546,39 @@ class CBVs():
             # coeffs for all stars but also for the CBV only stars
             for cbv_id in sorted(self.cbvs.keys()):
 
-                fig, ax = plt.subplots(nrows=3, ncols=1)
+                fig, ax = plt.subplots(nrows=3, ncols=1, sharex=True)
+
+                # do some stats to limit the coeffs axis
+                med = np.median(self.fit_coeffs[cbv_id])
+                mad = median_absolute_deviation(self.fit_coeffs[cbv_id])
+                llim = med - 3*mad
+                ulim = med + 3*mad
 
                 # plot against ra
-                ax[0].plot(catalog.ra, self.fit_coeffs[cbv_id], 'b.', label='All targets')
-                ax[0].plot(catalog.ra[self.cbv_mask], self.fit_coeffs[cbv_id][self.cbv_mask],
+                ax[0].plot(self.fit_coeffs[cbv_id], catalog.ra, 'b.', label='All targets')
+                ax[0].plot(self.fit_coeffs[cbv_id][self.cbv_mask], catalog.ra[self.cbv_mask],
                            'r.', label='Targets for SVD')
-                ax[0].set_xlabel("R.A.")
-                ax[0].set_ylabel(f"Coeff value, CBV {cbv_id}")
+                ax[0].set_ylabel("R.A.")
+                ax[0].set_xlabel(f"Coeff value, CBV {cbv_id}")
+                ax[0].set_xlim(llim, ulim)
                 ax[0].legend()
 
                 # plot against dec
-                ax[1].plot(catalog.dec, self.fit_coeffs[cbv_id], 'b.', label='All targets')
-                ax[1].plot(catalog.dec[self.cbv_mask], self.fit_coeffs[cbv_id][self.cbv_mask],
+                ax[1].plot(self.fit_coeffs[cbv_id], catalog.dec, 'b.', label='All targets')
+                ax[1].plot(self.fit_coeffs[cbv_id][self.cbv_mask], catalog.dec[self.cbv_mask],
                            'r.', label='Targets for SVD')
-                ax[1].set_xlabel("Dec.")
-                ax[1].set_ylabel(f"Coeff value, CBV {cbv_id}")
+                ax[1].set_ylabel("Dec.")
+                ax[1].set_xlabel(f"Coeff value, CBV {cbv_id}")
+                ax[1].set_xlim(llim, ulim)
                 ax[1].legend()
 
                 # plot against mag
-                ax[2].plot(catalog.mag, self.fit_coeffs[cbv_id], 'b.', label='All targets')
-                ax[2].plot(catalog.mag[self.cbv_mask], self.fit_coeffs[cbv_id][self.cbv_mask],
+                ax[2].plot(self.fit_coeffs[cbv_id], catalog.mag, 'b.', label='All targets')
+                ax[2].plot(self.fit_coeffs[cbv_id][self.cbv_mask], catalog.mag[self.cbv_mask],
                            'r.', label='Targets for SVD')
-                ax[2].set_xlabel("Mag")
-                ax[2].set_ylabel(f"Coeff value, CBV {cbv_id}")
+                ax[2].set_ylabel("Mag")
+                ax[2].set_xlabel(f"Coeff value, CBV {cbv_id}")
+                ax[2].set_xlim(llim, ulim)
                 ax[2].legend()
 
                 fig.tight_layout()
