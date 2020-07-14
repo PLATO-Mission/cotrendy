@@ -533,6 +533,48 @@ class CBVs():
             self.theta[j] = np.linspace(min(self.fit_coeffs[j])-0.10*theta_range,
                                         max(self.fit_coeffs[j])+0.10*theta_range, 2500)
 
+    def plot_fit_coeff_correlations(self, catalog):
+        """
+        Take the fitted coeffs and the input catalog and plot
+        the coeffs against ra, dec, mag etc to look for correlations
+        for each basis vector
+        """
+        print("Plotting fit coefficients correlations...")
+        with PdfPages(f"{self.direc}/fit_coeff_correlations_{self.camera_id}_{self.phot_file}.pdf") as pdf:
+            # loop over ra, dec and mag for each CBV and plot the
+            # coeffs for all stars but also for the CBV only stars
+            for cbv_id in sorted(self.cbvs.keys()):
+
+                fig, ax = plt.subplots(nrows=3, ncols=1)
+
+                # plot against ra
+                ax[0].plot(catalog.ra, self.fit_coeffs[cbv_id], 'b.', label='All targets')
+                ax[0].plot(catalog.ra[self.cbv_mask], self.fit_coeffs[cbv_id][self.cbv_mask],
+                           'r.', label='Targets for SVD')
+                ax[0].set_xlabel("R.A.")
+                ax[0].set_ylabel(f"Coeff value, CBV {cbv_id}")
+                ax[0].legend()
+
+                # plot against dec
+                ax[1].plot(catalog.dec, self.fit_coeffs[cbv_id], 'b.', label='All targets')
+                ax[1].plot(catalog.dec[self.cbv_mask], self.fit_coeffs[cbv_id][self.cbv_mask],
+                           'r.', label='Targets for SVD')
+                ax[1].set_xlabel("Dec.")
+                ax[1].set_ylabel(f"Coeff value, CBV {cbv_id}")
+                ax[1].legend()
+
+                # plot against mag
+                ax[2].plot(catalog.mag, self.fit_coeffs[cbv_id], 'b.', label='All targets')
+                ax[2].plot(catalog.mag[self.cbv_mask], self.fit_coeffs[cbv_id][self.cbv_mask],
+                           'r.', label='Targets for SVD')
+                ax[2].set_xlabel("Mag")
+                ax[2].set_ylabel(f"Coeff value, CBV {cbv_id}")
+                ax[2].legend()
+
+                fig.tight_layout()
+                pdf.savefig()
+                plt.close()
+
     def cotrend_data_map_mp(self, catalog):
         """
         Use multiprocessing to speed up the cotrending of many lcs
