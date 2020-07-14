@@ -551,15 +551,14 @@ class CBVs():
                 # do some stats to limit the coeffs axis
                 med = np.median(self.fit_coeffs[cbv_id])
                 mad = median_absolute_deviation(self.fit_coeffs[cbv_id])
-                llim = med - 3*mad
-                ulim = med + 3*mad
+                llim = med - 4*mad
+                ulim = med + 4*mad
 
                 # plot against ra
                 ax[0].plot(self.fit_coeffs[cbv_id], catalog.ra, 'b.', label='All targets')
                 ax[0].plot(self.fit_coeffs[cbv_id][self.cbv_mask], catalog.ra[self.cbv_mask],
                            'r.', label='Targets for SVD')
                 ax[0].set_ylabel("R.A.")
-                ax[0].set_xlabel(f"Coeff value, CBV {cbv_id}")
                 ax[0].set_xlim(llim, ulim)
                 ax[0].legend()
 
@@ -568,7 +567,6 @@ class CBVs():
                 ax[1].plot(self.fit_coeffs[cbv_id][self.cbv_mask], catalog.dec[self.cbv_mask],
                            'r.', label='Targets for SVD')
                 ax[1].set_ylabel("Dec.")
-                ax[1].set_xlabel(f"Coeff value, CBV {cbv_id}")
                 ax[1].set_xlim(llim, ulim)
                 ax[1].legend()
 
