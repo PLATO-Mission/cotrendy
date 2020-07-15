@@ -17,6 +17,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+import jastro.lightcurves as jlc
 from cotrendy.map import MAP
 
 # pylint: disable=invalid-name
@@ -551,29 +552,80 @@ class CBVs():
                 # do some stats to limit the coeffs axis
                 med = np.median(self.fit_coeffs[cbv_id])
                 mad = median_absolute_deviation(self.fit_coeffs[cbv_id])
-                llim = med - 4*mad
-                ulim = med + 4*mad
+                llim = med - 5*mad
+                ulim = med + 5*mad
+
+                # plot some running averages also, sort by ra, dec, mag
+                # then bin and plot over the data
+
+                # RA running averages
+                temp_ra = zip(catalog.ra, self.fit_coeffs[cbv_id])
+                temp_ra_m = zip(catalog.ra[self.cbv_mask], self.fit_coeffs[cbv_id][self.cbv_mask])
+                temp_ra_s = sorted(temp_ra)
+                temp_ra_m_s = sorted(temp_ra_m)
+                ra_sorted, ra_coeff_sorted = zip(*temp_ra_s)
+                ra_mask_sorted, ra_coeff_mask_sorted = zip(*temp_ra_m_s)
+                ra_sorted_bin, ra_coeff_sorted_bin, _ = jlc.pc_bin(ra_sorted, ra_coeff_sorted,
+                                                                   ra_coeff_sorted, 0.5)
+                ra_mask_sorted_bin, ra_coeff_mask_sorted_bin, _ = jlc.pc_bin(ra_mask_sorted,
+                                                                             ra_coeff_mask_sorted,
+                                                                             ra_coeff_mask_sorted,
+                                                                             0.5)
+
+                # DEC running averages
+                temp_dec = zip(catalog.dec, self.fit_coeffs[cbv_id])
+                temp_dec_m = zip(catalog.dec[self.cbv_mask], self.fit_coeffs[cbv_id][self.cbv_mask])
+                temp_dec_s = sorted(temp_dec)
+                temp_dec_m_s = sorted(temp_dec_m)
+                dec_sorted, dec_coeff_sorted = zip(*temp_dec_s)
+                dec_mask_sorted, dec_coeff_mask_sorted = zip(*temp_dec_m_s)
+                dec_sorted_bin, dec_coeff_sorted_bin, _ = jlc.pc_bin(dec_sorted, dec_coeff_sorted,
+                                                                     dec_coeff_sorted, 0.5)
+                dec_mask_sorted_bin, dec_coeff_mask_sorted_bin, _ = jlc.pc_bin(dec_mask_sorted,
+                                                                               dec_coeff_mask_sorted,
+                                                                               dec_coeff_mask_sorted,
+                                                                               0.5)
+
+                # Mag running averages
+                temp_mag = zip(catalog.mag, self.fit_coeffs[cbv_id])
+                temp_mag_m = zip(catalog.mag[self.cbv_mask], self.fit_coeffs[cbv_id][self.cbv_mask])
+                temp_mag_s = sorted(temp_mag)
+                temp_mag_m_s = sorted(temp_mag_m)
+                mag_sorted, mag_coeff_sorted = zip(*temp_mag_s)
+                mag_mask_sorted, mag_coeff_mask_sorted = zip(*temp_mag_m_s)
+                mag_sorted_bin, mag_coeff_sorted_bin, _ = jlc.pc_bin(mag_sorted, mag_coeff_sorted,
+                                                                     mag_coeff_sorted, 0.5)
+                mag_mask_sorted_bin, mag_coeff_mask_sorted_bin, _ = jlc.pc_bin(mag_mask_sorted,
+                                                                               mag_coeff_mask_sorted,
+                                                                               mag_coeff_mask_sorted,
+                                                                               0.25)
 
                 # plot against ra
                 ax[0].plot(self.fit_coeffs[cbv_id], catalog.ra, 'b.', label='All targets')
                 ax[0].plot(self.fit_coeffs[cbv_id][self.cbv_mask], catalog.ra[self.cbv_mask],
                            'r.', label='Targets for SVD')
+                ax[0].plot(ra_coeff_sorted_bin, ra_sorted_bin, 'k-', label="All")
+                ax[0].plot(ra_coeff_mask_sorted_bin, ra_mask_sorted_bin, 'k--', label="SVD")
                 ax[0].set_ylabel("R.A.")
                 ax[0].set_xlim(llim, ulim)
                 ax[0].legend()
 
                 # plot against dec
-                ax[1].plot(self.fit_coeffs[cbv_id], catalog.dec, 'b.', label='All targets')
+                ax[1].plot(self.fit_coeffs[cbv_id], catalog.dec, 'b.', label='All')
                 ax[1].plot(self.fit_coeffs[cbv_id][self.cbv_mask], catalog.dec[self.cbv_mask],
-                           'r.', label='Targets for SVD')
+                           'r.', label='SVD')
+                ax[1].plot(dec_coeff_sorted_bin, dec_sorted_bin, 'k-', label="All")
+                ax[1].plot(dec_coeff_mask_sorted_bin, dec_mask_sorted_bin, 'k--', label="SVD")
                 ax[1].set_ylabel("Dec.")
                 ax[1].set_xlim(llim, ulim)
                 ax[1].legend()
 
                 # plot against mag
-                ax[2].plot(self.fit_coeffs[cbv_id], catalog.mag, 'b.', label='All targets')
+                ax[2].plot(self.fit_coeffs[cbv_id], catalog.mag, 'b.', label='All')
                 ax[2].plot(self.fit_coeffs[cbv_id][self.cbv_mask], catalog.mag[self.cbv_mask],
-                           'r.', label='Targets for SVD')
+                           'r.', label='SVD')
+                ax[2].plot(mag_coeff_sorted_bin, mag_sorted_bin, 'k-', label="All")
+                ax[2].plot(mag_coeff_mask_sorted_bin, mag_mask_sorted_bin, 'k--', label="SVD")
                 ax[2].set_ylabel("Mag")
                 ax[2].set_xlabel(f"Coeff value, CBV {cbv_id}")
                 ax[2].set_xlim(llim, ulim)
