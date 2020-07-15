@@ -569,7 +569,7 @@ class CBVs():
                 ra_mask_sorted_bin, ra_coeff_mask_sorted_bin, _ = jlc.pc_bin(ra_cor_m_s[0],
                                                                              ra_cor_m_s[1],
                                                                              ra_cor_m_s[1],
-                                                                             0.5)
+                                                                             1.0)
 
                 # DEC running averages
                 dec_cor = np.vstack((catalog.dec, self.fit_coeffs[cbv_id]))
@@ -582,7 +582,7 @@ class CBVs():
                 dec_mask_sorted_bin, dec_coeff_mask_sorted_bin, _ = jlc.pc_bin(dec_cor_m_s[0],
                                                                                dec_cor_m_s[1],
                                                                                dec_cor_m_s[1],
-                                                                               0.5)
+                                                                               1.0)
 
                 # Mag running averages
                 mag_cor = np.vstack((catalog.mag, self.fit_coeffs[cbv_id]))
