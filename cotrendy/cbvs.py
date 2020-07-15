@@ -600,7 +600,7 @@ class CBVs():
                 # plot against ra
                 ax[0].plot(self.fit_coeffs[cbv_id], catalog.ra, '.', color='grey', label='All')
                 ax[0].plot(self.fit_coeffs[cbv_id][self.cbv_mask], catalog.ra[self.cbv_mask],
-                           'k.', label='Targets for SVD')
+                           'k.', label='SVD')
                 ax[0].plot(ra_coeff_sorted_bin, ra_sorted_bin, 'b-', label="All")
                 ax[0].plot(ra_coeff_mask_sorted_bin, ra_mask_sorted_bin, 'r-', label="SVD")
                 ax[0].set_ylabel("R.A.")
