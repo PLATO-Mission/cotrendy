@@ -565,7 +565,7 @@ class CBVs():
                 ra_cor_m_s = ra_cor_m[:, ra_cor_m[0].argsort()]
 
                 ra_sorted_bin, ra_coeff_sorted_bin, _ = jlc.pc_bin(ra_cor_s[0], ra_cor_s[1],
-                                                                   ra_cor_s[1], 0.5)
+                                                                   ra_cor_s[1], 0.5, mode="median")
                 ra_mask_sorted_bin, ra_coeff_mask_sorted_bin, _ = jlc.pc_bin(ra_cor_m_s[0],
                                                                              ra_cor_m_s[1],
                                                                              ra_cor_m_s[1],
@@ -578,7 +578,7 @@ class CBVs():
                 dec_cor_m_s = dec_cor_m[:, dec_cor_m[0].argsort()]
 
                 dec_sorted_bin, dec_coeff_sorted_bin, _ = jlc.pc_bin(dec_cor_s[0], dec_cor_s[1],
-                                                                     dec_cor_s[1], 0.5)
+                                                                     dec_cor_s[1], 0.5, mode="median")
                 dec_mask_sorted_bin, dec_coeff_mask_sorted_bin, _ = jlc.pc_bin(dec_cor_m_s[0],
                                                                                dec_cor_m_s[1],
                                                                                dec_cor_m_s[1],
@@ -591,7 +591,7 @@ class CBVs():
                 mag_cor_m_s = mag_cor_m[:, mag_cor_m[0].argsort()]
 
                 mag_sorted_bin, mag_coeff_sorted_bin, _ = jlc.pc_bin(mag_cor_s[0], mag_cor_s[1],
-                                                                     mag_cor_s[1], 0.5)
+                                                                     mag_cor_s[1], 0.5, mode="median")
                 mag_mask_sorted_bin, mag_coeff_mask_sorted_bin, _ = jlc.pc_bin(mag_cor_m_s[0],
                                                                                mag_cor_m_s[1],
                                                                                mag_cor_m_s[1],
