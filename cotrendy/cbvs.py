@@ -559,46 +559,43 @@ class CBVs():
                 # then bin and plot over the data
 
                 # RA running averages
-                temp_ra = zip(catalog.ra, self.fit_coeffs[cbv_id])
-                temp_ra_m = zip(catalog.ra[self.cbv_mask], self.fit_coeffs[cbv_id][self.cbv_mask])
-                temp_ra_s = sorted(temp_ra)
-                temp_ra_m_s = sorted(temp_ra_m)
-                ra_sorted, ra_coeff_sorted = zip(*temp_ra_s)
-                ra_mask_sorted, ra_coeff_mask_sorted = zip(*temp_ra_m_s)
-                ra_sorted_bin, ra_coeff_sorted_bin, _ = jlc.pc_bin(ra_sorted, ra_coeff_sorted,
-                                                                   ra_coeff_sorted, 0.5)
-                ra_mask_sorted_bin, ra_coeff_mask_sorted_bin, _ = jlc.pc_bin(ra_mask_sorted,
-                                                                             ra_coeff_mask_sorted,
-                                                                             ra_coeff_mask_sorted,
+                ra_cor = np.vstack((catalog.ra, self.fit_coeffs[cbv_id]))
+                ra_cor_s = ra_cor[:, ra_cor[0].argsort()]
+                ra_cor_m = np.vstack((catalog.ra[self.cbv_mask], self.fit_coeffs[cbv_id][self.cbv_mask]))
+                ra_cor_m_s = ra_cor_m[:, ra_cor_m[0].argsort()]
+
+                ra_sorted_bin, ra_coeff_sorted_bin, _ = jlc.pc_bin(ra_cor_s[0], ra_cor_s[1],
+                                                                   ra_cor_s[1], 0.5)
+                ra_mask_sorted_bin, ra_coeff_mask_sorted_bin, _ = jlc.pc_bin(ra_cor_m_s[0],
+                                                                             ra_cor_m_s[1],
+                                                                             ra_cor_m_s[1],
                                                                              0.5)
 
                 # DEC running averages
-                temp_dec = zip(catalog.dec, self.fit_coeffs[cbv_id])
-                temp_dec_m = zip(catalog.dec[self.cbv_mask], self.fit_coeffs[cbv_id][self.cbv_mask])
-                temp_dec_s = sorted(temp_dec)
-                temp_dec_m_s = sorted(temp_dec_m)
-                dec_sorted, dec_coeff_sorted = zip(*temp_dec_s)
-                dec_mask_sorted, dec_coeff_mask_sorted = zip(*temp_dec_m_s)
-                dec_sorted_bin, dec_coeff_sorted_bin, _ = jlc.pc_bin(dec_sorted, dec_coeff_sorted,
-                                                                     dec_coeff_sorted, 0.5)
-                dec_mask_sorted_bin, dec_coeff_mask_sorted_bin, _ = jlc.pc_bin(dec_mask_sorted,
-                                                                               dec_coeff_mask_sorted,
-                                                                               dec_coeff_mask_sorted,
+                dec_cor = np.vstack((catalog.dec, self.fit_coeffs[cbv_id]))
+                dec_cor_s = dec_cor[:, dec_cor[0].argsort()]
+                dec_cor_m = np.vstack((catalog.dec[self.cbv_mask], self.fit_coeffs[cbv_id][self.cbv_mask]))
+                dec_cor_m_s = dec_cor_m[:, dec_cor_m[0].argsort()]
+
+                dec_sorted_bin, dec_coeff_sorted_bin, _ = jlc.pc_bin(dec_cor_s[0], dec_cor_s[1],
+                                                                     dec_cor_s[1], 0.5)
+                dec_mask_sorted_bin, dec_coeff_mask_sorted_bin, _ = jlc.pc_bin(dec_cor_m_s[0],
+                                                                               dec_cor_m_s[1],
+                                                                               dec_cor_m_s[1],
                                                                                0.5)
 
                 # Mag running averages
-                temp_mag = zip(catalog.mag, self.fit_coeffs[cbv_id])
-                temp_mag_m = zip(catalog.mag[self.cbv_mask], self.fit_coeffs[cbv_id][self.cbv_mask])
-                temp_mag_s = sorted(temp_mag)
-                temp_mag_m_s = sorted(temp_mag_m)
-                mag_sorted, mag_coeff_sorted = zip(*temp_mag_s)
-                mag_mask_sorted, mag_coeff_mask_sorted = zip(*temp_mag_m_s)
-                mag_sorted_bin, mag_coeff_sorted_bin, _ = jlc.pc_bin(mag_sorted, mag_coeff_sorted,
-                                                                     mag_coeff_sorted, 0.5)
-                mag_mask_sorted_bin, mag_coeff_mask_sorted_bin, _ = jlc.pc_bin(mag_mask_sorted,
-                                                                               mag_coeff_mask_sorted,
-                                                                               mag_coeff_mask_sorted,
-                                                                               0.25)
+                mag_cor = np.vstack((catalog.mag, self.fit_coeffs[cbv_id]))
+                mag_cor_s = mag_cor[:, mag_cor[0].argsort()]
+                mag_cor_m = np.vstack((catalog.mag[self.cbv_mask], self.fit_coeffs[cbv_id][self.cbv_mask]))
+                mag_cor_m_s = mag_cor_m[:, mag_cor_m[0].argsort()]
+
+                mag_sorted_bin, mag_coeff_sorted_bin, _ = jlc.pc_bin(mag_cor_s[0], mag_cor_s[1],
+                                                                     mag_cor_s[1], 0.5)
+                mag_mask_sorted_bin, mag_coeff_mask_sorted_bin, _ = jlc.pc_bin(mag_cor_m_s[0],
+                                                                               mag_cor_m_s[1],
+                                                                               mag_cor_m_s[1],
+                                                                               0.5)
 
                 # plot against ra
                 ax[0].plot(self.fit_coeffs[cbv_id], catalog.ra, 'b.', label='All targets')
