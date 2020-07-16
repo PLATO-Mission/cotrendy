@@ -33,6 +33,9 @@ class Catalog():
         self.dec = None
         self.mag = None
         self.ids = None
+        self.ra_weight = float(config['catalog']['dim_weights'][0])
+        self.dec_weight = float(config['catalog']['dim_weights'][1])
+        self.mag_weight = float(config['catalog']['dim_weights'][2])
         self.load_catalog(config, apply_mask)
 
     def load_catalog(self, cfg, apply_mask):

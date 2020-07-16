@@ -6,6 +6,7 @@ from collections import defaultdict
 import numpy as np
 from scipy.stats import gaussian_kde
 from scipy.integrate import simps
+from scipy.stats import median_absolute_deviation as mad
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -116,9 +117,9 @@ class MAP():
         cbvs : CBVs object
             Contains information about the basis vectors
         """
-        lamb = np.matrix(np.diag([np.var(catalog.ra[self.prior_mask]),
-                                  np.var(catalog.dec[self.prior_mask]),
-                                  np.var(catalog.mag[self.prior_mask])]))
+        lamb = np.matrix(np.diag([mad(catalog.ra[self.prior_mask])/catalog.ra_weight,
+                                  mad(catalog.dec[self.prior_mask])/catalog.dec_weight,
+                                  mad(catalog.mag[self.prior_mask])/catalog.mag_weight]))
         lamb_inv = np.linalg.inv(lamb)
 
         # work out the distances in the 3D parameter space
