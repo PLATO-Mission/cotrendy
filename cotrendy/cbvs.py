@@ -462,7 +462,7 @@ class CBVs():
         print("Calculating CBVs fit coeffs...")
 
         # initial guess at fit coeffs
-        x0 = [-0.1]*self.n_cbvs
+        x0 = [-0.1]*len(self.vect_store)
         cbv_ids = sorted(self.cbvs.keys())
 
         for i in range(0, len(self.norm_flux_array)):
