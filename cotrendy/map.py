@@ -376,8 +376,8 @@ class MAP():
             _ = ax.hist(sorted_coeffs[llim:ulim], bins=self.hist_bins,
                         density=True, label='Theta Histogram')
             # draw a vertical line for the max of each PDF
-            _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--')
-            _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--')
+            _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--', label="prior")
+            _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--', label="cond")
             #_ = ax.axvline(min(self.posterior_peak_theta[i]), color='green', ls='--')
             #_ = ax.axvline(max(self.posterior_peak_theta[i]), color='green', ls='--')
             label = f"Theta PDFw ({self.prior_peak_theta[i]:.4f})"
@@ -385,7 +385,7 @@ class MAP():
                         label=label)
             #_ = ax.set_xlabel('Theta')
             #_ = ax.set_ylabel('Frequency')
-            #_ = ax.legend()
+            _ = ax.legend()
 
         fig.tight_layout()
         fig.savefig(f"{self.direc}/prior_pdfs_star{self.tus_id:06d}.png")
@@ -408,8 +408,8 @@ class MAP():
 
         for i, ax in zip(sorted(cbvs.cbvs.keys()), axar):
             # draw a vertical line for the max of each PDF
-            _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--')
-            _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--')
+            _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--', label="prior")
+            _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--', label="cond")
             #_ = ax.axvline(min(self.posterior_peak_theta[i]), color='green', ls='--')
             #_ = ax.axvline(max(self.posterior_peak_theta[i]), color='green', ls='--')
             label = f"Cond ({self.cond_peak_theta[i]:.4f})"
@@ -417,7 +417,7 @@ class MAP():
                         label=label)
             #_ = ax.set_xlabel('Theta')
             #_ = ax.set_ylabel('Arbitrary units')
-            #_ = ax.legend()
+            _ = ax.legend()
 
         fig.tight_layout()
         fig.savefig(f"{self.direc}/conditional_pdfs_star{self.tus_id:06d}.png")
@@ -443,13 +443,13 @@ class MAP():
                 label = f"Pr_w={self.prior_pdf_weights[j]}"
                 _ = ax.plot(cbvs.theta[i], pdf, label=label)
             # draw a vertical line for the max of each PDF
-            _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--')
-            _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--')
+            _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--', label="prior")
+            _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--', label="cond")
             #_ = ax.axvline(min(self.posterior_peak_theta[i]), color='green', ls='--')
             #_ = ax.axvline(max(self.posterior_peak_theta[i]), color='green', ls='--')
             #_ = ax.set_xlabel('Theta')
             #_ = ax.set_ylabel('Arbitrary units')
-            #_ = ax.legend()
+            _ = ax.legend()
 
         fig.tight_layout()
         fig.savefig(f"{self.direc}/posterior_pdfs_star{self.tus_id:06d}.png")
