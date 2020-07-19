@@ -403,6 +403,18 @@ class CBVs():
         # make them into a numpy array
         self.vect_store = np.array(vect_store)
 
+        # plot the CBVs for everyone to see
+        output_filename = f"{self.direc}/cbvs.png"
+        fig, ax = plt.subplots(self.n_cbvs, figsize=(10, 10))
+        for i, cbv_id in enumerate(sorted(self.cbvs.keys())):
+            ax[i].plot(self.cbvs[cbv_id], label=f'CBV {cbv_id}')
+            ax[i].legend()
+        fig.tight_layout()
+        fig.savefig(output_filename)
+        fig.clf()
+        plt.close()
+        gc.collect()
+
     def _check_for_dominating_stars(self, cbv_pass):
         """
         Kepler implements a check for stars
