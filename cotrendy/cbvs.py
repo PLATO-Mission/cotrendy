@@ -9,7 +9,7 @@ from functools import partial
 from multiprocessing import Pool
 from collections import defaultdict
 import numpy as np
-from scipy.stats import pearsonr
+#from scipy.stats import pearsonr
 from scipy.linalg import svd
 import scipy.optimize as optimization
 from scipy.stats import median_absolute_deviation
@@ -114,8 +114,8 @@ class CBVs():
 
         # params for generating CBVs
         self.correlations = defaultdict(list)
-        self.median_correlations = []
-        self.high_correlation_mask = []
+        self.median_abs_correlations = []
+        #self.high_correlation_mask = []
         self.norm_flux_dithered_array = None
 
         # SVD params
@@ -209,52 +209,76 @@ class CBVs():
 
     def calculate_pearson_correlation(self):
         """
-        Take the array of targets and find the most correlated
+        There is a much faster way to get the median absolute correlation
 
-        TODO: This is terrible code, fix this when happy with method!!!
+        It is explained nicely here:
+        https://towardsdatascience.com/x%E1%B5%80x-covariance-correlation-and-cosine-matrices-d2230997fb7
+        And can also be seen in the Kepler pipeline here:
+        https://github.com/nasa/kepler-pipeline/blob/f58b21df2c82969d8bd3e26a269bd7f5b9a770e1/source-code/matlab/pdc/mfiles/pdc_compute_correlation.m#L63
 
-        # old method:
-        # NOTE: This original stat of median correlation is too basic for real data
-        # It is dominated by faint stars. We need to find those that highly correlate
-        # more carefully and then compare them to each other, take that as their correlation
-        # statistic. Finally when selecting the best ones, we want the top 50% of ONLY the
-        # good ones, not 50% of all of them!
-        #self.median_correlations = np.array([np.median(self.correlations[i]) for i in self.correlations])
+        By taking an array of normalised fluxes (scaling them by their per star RMS)
+        and then multiplying the array by its transpose and dividing by the
+        number of observations, we get a correlation maxtrix equivilant to the pearson
+        correlation.
         """
+        n_cadences = len(self.norm_flux_array[0])
+        n_targets = len(self.norm_flux_array)
+        per_object_rms = np.std(self.norm_flux_array, axis=1).reshape(n_targets, -1)
+        unit_norm_flux = self.norm_flux_array / per_object_rms
+        correlation_matrix = (unit_norm_flux @ unit_norm_flux.T) / n_cadences
+        self.median_abs_correlations = np.median(np.abs(correlation_matrix), axis=0)
 
-        print("Finding correlated stars...")
-        n_stars_to_correlate = len(self.norm_flux_array)
-        self.high_correlation_mask = []
-
-        for j in range(0, n_stars_to_correlate):
-            print(f"{j+1}/{n_stars_to_correlate}")
-            for i in range(0, n_stars_to_correlate):
-                if i != j:
-                    r = pearsonr(self.norm_flux_array[j], self.norm_flux_array[i])
-                    self.correlations[j].append(r[0])
-            # check if this star has high correlation with at least some stars
-            high_corr = np.where(np.array(self.correlations[j]) > 0.5)[0]
-            if len(high_corr) > 0.10*n_stars_to_correlate:
-                self.high_correlation_mask.append(j)
-
-        # now we know which are highly correlated
-        # loop over and make a mask to keep the best ones
-        # setting the not-good-ones to zero
-        print("Second pass on correlation stars...")
-        for j in range(0, n_stars_to_correlate):
-            # if the star is in the high correlation pile, continue
-            local_correlations = []
-            if j in self.high_correlation_mask:
-                for i in range(0, n_stars_to_correlate):
-                    if i in self.high_correlation_mask and i != j:
-                        local_correlations.append(pearsonr(self.norm_flux_array[j], self.norm_flux_array[i]))
-                self.median_correlations.append(np.median(local_correlations))
-            # else give it a score of 0 for correlation
-            else:
-                self.median_correlations.append(0)
-
-        # finally set the median correlations list as an array for masking
-        self.median_correlations = np.array(self.median_correlations)
+    #def calculate_pearson_correlation_old(self):
+    #    """
+    #
+    #    *** DEPRECATED ***
+    #
+    #    Take the array of targets and find the most correlated
+    #
+    #    TODO: This is terrible code, fix this when happy with method!!!
+    #
+    #    # old method:
+    #    # NOTE: This original stat of median correlation is too basic for real data
+    #    # It is dominated by faint stars. We need to find those that highly correlate
+    #    # more carefully and then compare them to each other, take that as their correlation
+    #    # statistic. Finally when selecting the best ones, we want the top 50% of ONLY the
+    #    # good ones, not 50% of all of them!
+    #    #self.median_abs_correlations = np.array([np.median(self.correlations[i]) for i in self.correlations])
+    #    """
+    #
+    #    print("Finding correlated stars...")
+    #    n_stars_to_correlate = len(self.norm_flux_array)
+    #    self.high_correlation_mask = []
+    #
+    #    for j in range(0, n_stars_to_correlate):
+    #        print(f"{j+1}/{n_stars_to_correlate}")
+    #        for i in range(0, n_stars_to_correlate):
+    #            if i != j:
+    #                r = pearsonr(self.norm_flux_array[j], self.norm_flux_array[i])
+    #                self.correlations[j].append(r[0])
+    #        # check if this star has high correlation with at least some stars
+    #        high_corr = np.where(np.array(self.correlations[j]) > 0.5)[0]
+    #        if len(high_corr) > 0.10*n_stars_to_correlate:
+    #            self.high_correlation_mask.append(j)
+    #
+    #    # now we know which are highly correlated
+    #    # loop over and make a mask to keep the best ones
+    #    # setting the not-good-ones to zero
+    #    print("Second pass on correlation stars...")
+    #    for j in range(0, n_stars_to_correlate):
+    #        # if the star is in the high correlation pile, continue
+    #        local_correlations = []
+    #        if j in self.high_correlation_mask:
+    #            for i in range(0, n_stars_to_correlate):
+    #                if i in self.high_correlation_mask and i != j:
+    #                    local_correlations.append(pearsonr(self.norm_flux_array[j], self.norm_flux_array[i]))
+    #            self.median_abs_correlations.append(np.median(local_correlations))
+    #        # else give it a score of 0 for correlation
+    #        else:
+    #            self.median_abs_correlations.append(0)
+    #
+    #    # finally set the median correlations list as an array for masking
+    #    self.median_abs_correlations = np.array(self.median_abs_correlations)
 
     def _mask_stars_for_cbvs(self):
         """
@@ -267,7 +291,7 @@ class CBVs():
         go to 0.
         """
         print("Masking poor CBV stars...")
-        self.pre_cbv_mask = self.median_correlations * self.variability_mask * self.cbv_domination
+        self.pre_cbv_mask = self.median_abs_correlations * self.variability_mask * self.cbv_domination
         # sort the lcs by combined mask score
         temp = zip(self.pre_cbv_mask, self.lc_idx)
         temp = sorted(temp, reverse=True)
@@ -480,10 +504,10 @@ class CBVs():
         for j in cbv_ids:
             # remember to cast the fit_coeffs as an array for later use
             self.fit_coeffs[j] = np.array(self.fit_coeffs[j])
-            theta_range = abs(max(self.fit_coeffs[j]) - min(self.fit_coeffs[j]))
-            # generate generous range of theta
-            self.theta[j] = np.linspace(min(self.fit_coeffs[j])-0.10*theta_range,
-                                        max(self.fit_coeffs[j])+0.10*theta_range, 2500)
+            theta_range = np.percentile(self.fit_coeffs[j], 95) - np.percentile(self.fit_coeffs[j], 5)
+            theta_llim = np.percentile(self.fit_coeffs[j], 5) - theta_range
+            theta_ulim = np.percentile(self.fit_coeffs[j], 95) + theta_range
+            self.theta[j] = np.linspace(theta_llim, theta_ulim, 2500)
 
     @staticmethod
     def _fit_cbv_to_data(x, y, cbv):
@@ -530,10 +554,10 @@ class CBVs():
             self.fit_coeffs[j] = np.array(self.fit_coeffs[j])
             # now we have the full range of fit coeffs, we can make
             # theta which will be used in MAP for generating PDFs
-            theta_range = abs(max(self.fit_coeffs[j]) - min(self.fit_coeffs[j]))
-            # generate generous range of theta
-            self.theta[j] = np.linspace(min(self.fit_coeffs[j])-0.10*theta_range,
-                                        max(self.fit_coeffs[j])+0.10*theta_range, 2500)
+            theta_range = np.percentile(self.fit_coeffs[j], 95) - np.percentile(self.fit_coeffs[j], 5)
+            theta_llim = np.percentile(self.fit_coeffs[j], 5) - theta_range
+            theta_ulim = np.percentile(self.fit_coeffs[j], 95) + theta_range
+            self.theta[j] = np.linspace(theta_llim, theta_ulim, 2500)
 
     def plot_fit_coeff_correlations(self, catalog):
         """

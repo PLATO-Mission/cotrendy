@@ -367,7 +367,13 @@ class MAP():
             axar = [axar]
 
         for i, ax in zip(sorted(cbvs.cbvs.keys()), axar):
-            _ = ax.hist(cbvs.fit_coeffs[i], bins=self.hist_bins,
+            # only plot the middle 96% of the objects, like the kepler plots
+            sorted_coeffs = sorted(cbvs.fit_coeffs[i])
+            llim = int(np.ceil(len(sorted_coeffs)*0.02))
+            ulim = int(np.ceil(len(sorted_coeffs)*0.98))
+
+            # make the plot
+            _ = ax.hist(sorted_coeffs[llim:ulim], bins=self.hist_bins,
                         density=True, label='Theta Histogram')
             # draw a vertical line for the max of each PDF
             _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--')
