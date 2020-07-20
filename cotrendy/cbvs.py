@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import jastro.lightcurves as jlc
 from cotrendy.map import MAP
+from cotrendy.utils import picklify
 
 # pylint: disable=invalid-name
 
@@ -95,11 +96,15 @@ class CBVs():
         # multiprocessing pool size
         self.pool_size = config['cotrend']['pool_size']
 
+        # enable debugging mode for alllll the plots
+        self.debug = config['global']['debug']
+
         # shortlist of stars to analyse more closely
         self.test_stars = config['cotrend']['test_stars']
 
         # placeholder for normalise variability stats
         self.normalised_variability_limit = config['cotrend']['normalised_variability_limit']
+        self.prior_normalised_variability_limit = config['cotrend']['prior_normalised_variability_limit']
         self.variability = None
 
         # placeholder for CBV domination checks
@@ -519,7 +524,7 @@ class CBVs():
             theta_range = np.percentile(self.fit_coeffs[j], 95) - np.percentile(self.fit_coeffs[j], 5)
             theta_llim = np.percentile(self.fit_coeffs[j], 5) - theta_range
             theta_ulim = np.percentile(self.fit_coeffs[j], 95) + theta_range
-            self.theta[j] = np.linspace(theta_llim, theta_ulim, 2500)
+            self.theta[j] = np.linspace(theta_llim, theta_ulim, 1000)
 
     @staticmethod
     def _fit_cbv_to_data(x, y, cbv):
@@ -742,31 +747,38 @@ def worker_fn(star_id, constants):
         return star_id, np.zeros(n_data_points)
 
     # make plots for the test stars
-    if star_id in cbvs.test_stars:
+    if star_id in cbvs.test_stars or cbvs.debug:
         mapp.plot_prior_pdf(cbvs)
         mapp.plot_conditional_pdf(cbvs)
         mapp.plot_posterior_pdf(cbvs)
+        # pickle the MAP object also for inspection
+        tic_id = int(catalog.ids[star_id])
+        map_filename = f"TIC-{tic_id}_map.pkl"
+        picklify(map_filename, mapp)
 
-    # work out very crudely if we want to use the prior or not
-    # then detrend the lightcurve and store the results
+    # try to use our super duper new posterior PDF
     correction_to_apply = []
     for cbv_id in sorted(cbvs.cbvs.keys()):
-        sigma = mapp.prior_sigma[cbv_id]
-        cond_peak_theta = mapp.cond_peak_theta[cbv_id]
-        prior_peak_theta = mapp.prior_peak_theta[cbv_id]
-        prior_cond_diff = abs(prior_peak_theta-cond_peak_theta)
+        #sigma = mapp.prior_sigma[cbv_id]
+        #cond_peak_theta = mapp.cond_peak_theta[cbv_id]
+        #prior_peak_theta = mapp.prior_peak_theta[cbv_id]
+        #prior_cond_diff = abs(prior_peak_theta-cond_peak_theta)
+        #
+        ## so for simplicity here, we do the following
+        ## if the star is > variability_limit and the conditional
+        ## is > 5 sigma from the prior, this indicates a bad fit
+        ## use the prior. Else just use the conditional fit
+        #if cbvs.variability[star_id] > 3*cbvs.normalised_variability_limit and \
+        #    prior_cond_diff > 5*sigma:
+        #    best_theta = prior_peak_theta
+        #else:
+        #    best_theta = cond_peak_theta
+        #
+        #component = cbvs.cbvs[cbv_id]*best_theta
+        #correction_to_apply.append(component)
 
-        # so for simplicity here, we do the following
-        # if the star is > variability_limit and the conditional
-        # is > 5 sigma from the prior, this indicates a bad fit
-        # use the prior. Else just use the conditional fit
-        if cbvs.variability[star_id] > 3*cbvs.normalised_variability_limit and \
-            prior_cond_diff > 5*sigma:
-            best_theta = prior_peak_theta
-        else:
-            best_theta = cond_peak_theta
-
-        component = cbvs.cbvs[cbv_id]*best_theta
+        # uses the newly added posterior peak theta, which should weight the prior info
+        component = cbvs.cbvs[cbv_id]*mapp.posterior_peak_theta[cbv_id]
         correction_to_apply.append(component)
 
     # sum up the scaled CBVs then do the correction
