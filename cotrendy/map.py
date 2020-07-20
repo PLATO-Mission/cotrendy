@@ -61,7 +61,7 @@ class MAP():
 
         # posterior PDF
         self.posterior_prior_weight = 0.
-        self.posterior_pdf = defaultdict(list)
+        self.posterior_pdf = defaultdict(np.array)
         self.posterior_peak_theta = defaultdict(list)
         self.posterior_peak_pdf = defaultdict(list)
         self.posterior_max_success = defaultdict(list)
@@ -325,12 +325,12 @@ class MAP():
             sigma_snap_llim = self.prior_peak_theta[cbv_id] - self.prior_sigma[cbv_id]
             sigma_snap_ulim = self.prior_peak_theta[cbv_id] + self.prior_sigma[cbv_id]
             if sigma_snap_llim <= self.cond_peak_theta[cbv_id] <= sigma_snap_ulim:
-                self.posterior_pdf[cbv_id].append(self.cond_pdf[cbv_id])
+                self.posterior_pdf[cbv_id] = self.cond_pdf[cbv_id]
                 peak_theta = self.cond_peak_theta[cbv_id]
                 peak_pdf = self.cond_peak_pdf[cbv_id]
             else:
                 posterior = self.cond_pdf[cbv_id] + self.prior_pdf[cbv_id]*self.prior_weight
-                self.posterior_pdf[cbv_id].append(posterior)
+                self.posterior_pdf[cbv_id] = posterior
                 peak_theta, peak_pdf = self._maximise_pdf(cbvs.theta[cbv_id],
                                                           posterior,
                                                           'posterior')
