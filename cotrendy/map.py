@@ -337,12 +337,12 @@ class MAP():
 
             if peak_theta is None or peak_pdf is None:
                 self.posterior_max_success[cbv_id].append(False)
-                self.posterior_peak_theta[cbv_id].append(0.0)
-                self.posterior_peak_pdf[cbv_id].append(0.0)
+                self.posterior_peak_theta[cbv_id] = 0.0
+                self.posterior_peak_pdf[cbv_id] = 0.0
             else:
                 self.posterior_max_success[cbv_id].append(True)
-                self.posterior_peak_theta[cbv_id].append(peak_theta)
-                self.posterior_peak_pdf[cbv_id].append(peak_pdf)
+                self.posterior_peak_theta[cbv_id] = peak_theta
+                self.posterior_peak_pdf[cbv_id] = peak_pdf
 
     def _maximise_pdf(self, theta, pdf, pdf_type):
         """
@@ -447,8 +447,7 @@ class MAP():
             # draw a vertical line for the max of each PDF
             _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--', label="prior")
             _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--', label="cond")
-            #_ = ax.axvline(min(self.posterior_peak_theta[i]), color='green', ls='--')
-            #_ = ax.axvline(max(self.posterior_peak_theta[i]), color='green', ls='--')
+            _ = ax.axvline(self.posterior_peak_theta[i], color='green', ls='--', label="post")
             label = f"Theta PDFw ({self.prior_peak_theta[i]:.4f})"
             _ = ax.plot(cbvs.theta[i], self.prior_pdf[i], 'r-',
                         label=label)
@@ -479,8 +478,7 @@ class MAP():
             # draw a vertical line for the max of each PDF
             _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--', label="prior")
             _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--', label="cond")
-            #_ = ax.axvline(min(self.posterior_peak_theta[i]), color='green', ls='--')
-            #_ = ax.axvline(max(self.posterior_peak_theta[i]), color='green', ls='--')
+            _ = ax.axvline(self.posterior_peak_theta[i], color='green', ls='--', label="post")
             label = f"Cond ({self.cond_peak_theta[i]:.4f})"
             _ = ax.plot(cbvs.theta[i], self.cond_pdf[i], 'k-',
                         label=label)
@@ -508,14 +506,11 @@ class MAP():
             axar = [axar]
 
         for i, ax in zip(sorted(cbvs.cbvs.keys()), axar):
-            for j, pdf in enumerate(self.posterior_pdf[i]):
-                label = f"Pr_w={self.prior_weight[j]}"
-                _ = ax.plot(cbvs.theta[i], pdf, label=label)
+            _ = ax.plot(cbvs.theta[i], self.posterior_pdf[i], 'k-')
             # draw a vertical line for the max of each PDF
             _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--', label="prior")
             _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--', label="cond")
-            #_ = ax.axvline(min(self.posterior_peak_theta[i]), color='green', ls='--')
-            #_ = ax.axvline(max(self.posterior_peak_theta[i]), color='green', ls='--')
+            _ = ax.axvline(self.posterior_peak_theta[i], color='green', ls='--', label="post")
             #_ = ax.set_xlabel('Theta')
             #_ = ax.set_ylabel('Arbitrary units')
             _ = ax.legend()
