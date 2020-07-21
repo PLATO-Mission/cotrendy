@@ -39,6 +39,7 @@ class MAP():
         """
         self.tus_id = tus_id
         self.direc = cbvs.direc
+        self.id = catalog.ids[tus_id]
 
         # prior PDF
         self.distances = None
@@ -460,7 +461,7 @@ class MAP():
         except Exception:
             print("Prior plotting failed for star {self.tus_id}")
 
-        fig.savefig(f"{self.direc}/prior_pdfs_star{self.tus_id:06d}.png")
+        fig.savefig(f"{self.direc}/TIC-{self.id}_prior_pdfs.png")
         fig.clf()
         plt.close()
         gc.collect()
@@ -495,7 +496,7 @@ class MAP():
         except Exception:
             print("Prior plotting failed for star {self.tus_id}")
 
-        fig.savefig(f"{self.direc}/conditional_pdfs_star{self.tus_id:06d}.png")
+        fig.savefig(f"{self.direc}/TIC-{self.id}_conditional_pdfs.png")
         fig.clf()
         plt.close()
         gc.collect()
@@ -528,7 +529,7 @@ class MAP():
         except Exception:
             print("Prior plotting failed for star {self.tus_id}")
 
-        fig.savefig(f"{self.direc}/posterior_pdfs_star{self.tus_id:06d}.png")
+        fig.savefig(f"{self.direc}/TIC-{self.id}_posterior_pdfs.png")
         fig.clf()
         plt.close()
         gc.collect()
