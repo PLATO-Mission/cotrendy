@@ -753,7 +753,7 @@ def worker_fn(star_id, constants):
         mapp.plot_posterior_pdf(cbvs)
         # pickle the MAP object also for inspection
         tic_id = int(catalog.ids[star_id])
-        map_filename = f"TIC-{tic_id}_map.pkl"
+        map_filename = f"{cbvs.direc}/TIC-{tic_id}_map.pkl"
         picklify(map_filename, mapp)
 
     # try to use our super duper new posterior PDF
