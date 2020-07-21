@@ -524,7 +524,7 @@ class CBVs():
             theta_range = np.percentile(self.fit_coeffs[j], 98) - np.percentile(self.fit_coeffs[j], 2)
             theta_llim = np.percentile(self.fit_coeffs[j], 2) - theta_range
             theta_ulim = np.percentile(self.fit_coeffs[j], 98) + theta_range
-            self.theta[j] = np.linspace(theta_llim, theta_ulim, 2000)
+            self.theta[j] = np.linspace(theta_llim, theta_ulim, 1000)
 
     @staticmethod
     def _fit_cbv_to_data(x, y, cbv):
