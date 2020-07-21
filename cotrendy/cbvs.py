@@ -521,10 +521,10 @@ class CBVs():
         for j in cbv_ids:
             # remember to cast the fit_coeffs as an array for later use
             self.fit_coeffs[j] = np.array(self.fit_coeffs[j])
-            theta_range = np.percentile(self.fit_coeffs[j], 95) - np.percentile(self.fit_coeffs[j], 5)
-            theta_llim = np.percentile(self.fit_coeffs[j], 5) - theta_range
-            theta_ulim = np.percentile(self.fit_coeffs[j], 95) + theta_range
-            self.theta[j] = np.linspace(theta_llim, theta_ulim, 1000)
+            theta_range = np.percentile(self.fit_coeffs[j], 98) - np.percentile(self.fit_coeffs[j], 2)
+            theta_llim = np.percentile(self.fit_coeffs[j], 2) - theta_range
+            theta_ulim = np.percentile(self.fit_coeffs[j], 98) + theta_range
+            self.theta[j] = np.linspace(theta_llim, theta_ulim, 2000)
 
     @staticmethod
     def _fit_cbv_to_data(x, y, cbv):
