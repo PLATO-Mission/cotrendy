@@ -435,27 +435,31 @@ class MAP():
         if len(cbvs.cbvs.keys()) == 1:
             axar = [axar]
 
-        for i, ax in zip(sorted(cbvs.cbvs.keys()), axar):
-            # only plot the middle 96% of the objects, like the kepler plots
-            sorted_coeffs = sorted(cbvs.fit_coeffs[i])
-            llim = int(np.ceil(len(sorted_coeffs)*0.02))
-            ulim = int(np.ceil(len(sorted_coeffs)*0.98))
+        try:
+            for i, ax in zip(sorted(cbvs.cbvs.keys()), axar):
+                # only plot the middle 96% of the objects, like the kepler plots
+                sorted_coeffs = sorted(cbvs.fit_coeffs[i])
+                llim = int(np.ceil(len(sorted_coeffs)*0.02))
+                ulim = int(np.ceil(len(sorted_coeffs)*0.98))
 
-            # make the plot
-            _ = ax.hist(sorted_coeffs[llim:ulim], bins=self.hist_bins,
-                        density=True, label='Theta Histogram')
-            # draw a vertical line for the max of each PDF
-            _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--', label="prior")
-            _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--', label="cond")
-            _ = ax.axvline(self.posterior_peak_theta[i], color='green', ls='--', label="post")
-            label = f"Theta PDFw ({self.prior_peak_theta[i]:.4f})"
-            _ = ax.plot(cbvs.theta[i], self.prior_pdf[i], 'r-',
-                        label=label)
-            #_ = ax.set_xlabel('Theta')
-            #_ = ax.set_ylabel('Frequency')
-            _ = ax.legend()
+                # make the plot
+                _ = ax.hist(sorted_coeffs[llim:ulim], bins=self.hist_bins,
+                            density=True, label='Theta Histogram')
+                # draw a vertical line for the max of each PDF
+                _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--', label="prior")
+                _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--', label="cond")
+                _ = ax.axvline(self.posterior_peak_theta[i], color='green', ls='--', label="post")
+                label = f"Theta PDFw ({self.prior_peak_theta[i]:.4f})"
+                _ = ax.plot(cbvs.theta[i], self.prior_pdf[i], 'r-',
+                            label=label)
+                #_ = ax.set_xlabel('Theta')
+                #_ = ax.set_ylabel('Frequency')
+                _ = ax.legend()
 
-        fig.tight_layout()
+            fig.tight_layout()
+        except Exception:
+            print("Prior plotting failed for star {self.tus_id}")
+
         fig.savefig(f"{self.direc}/prior_pdfs_star{self.tus_id:06d}.png")
         fig.clf()
         plt.close()
@@ -474,19 +478,23 @@ class MAP():
         if len(cbvs.cbvs.keys()) == 1:
             axar = [axar]
 
-        for i, ax in zip(sorted(cbvs.cbvs.keys()), axar):
-            # draw a vertical line for the max of each PDF
-            _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--', label="prior")
-            _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--', label="cond")
-            _ = ax.axvline(self.posterior_peak_theta[i], color='green', ls='--', label="post")
-            label = f"Cond ({self.cond_peak_theta[i]:.4f})"
-            _ = ax.plot(cbvs.theta[i], self.cond_pdf[i], 'k-',
-                        label=label)
-            #_ = ax.set_xlabel('Theta')
-            #_ = ax.set_ylabel('Arbitrary units')
-            _ = ax.legend()
+        try:
+            for i, ax in zip(sorted(cbvs.cbvs.keys()), axar):
+                # draw a vertical line for the max of each PDF
+                _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--', label="prior")
+                _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--', label="cond")
+                _ = ax.axvline(self.posterior_peak_theta[i], color='green', ls='--', label="post")
+                label = f"Cond ({self.cond_peak_theta[i]:.4f})"
+                _ = ax.plot(cbvs.theta[i], self.cond_pdf[i], 'k-',
+                            label=label)
+                #_ = ax.set_xlabel('Theta')
+                #_ = ax.set_ylabel('Arbitrary units')
+                _ = ax.legend()
 
-        fig.tight_layout()
+            fig.tight_layout()
+        except Exception:
+            print("Prior plotting failed for star {self.tus_id}")
+
         fig.savefig(f"{self.direc}/conditional_pdfs_star{self.tus_id:06d}.png")
         fig.clf()
         plt.close()
@@ -505,17 +513,21 @@ class MAP():
         if len(cbvs.cbvs.keys()) == 1:
             axar = [axar]
 
-        for i, ax in zip(sorted(cbvs.cbvs.keys()), axar):
-            _ = ax.plot(cbvs.theta[i], self.posterior_pdf[i], 'k-')
-            # draw a vertical line for the max of each PDF
-            _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--', label="prior")
-            _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--', label="cond")
-            _ = ax.axvline(self.posterior_peak_theta[i], color='green', ls='--', label="post")
-            #_ = ax.set_xlabel('Theta')
-            #_ = ax.set_ylabel('Arbitrary units')
-            _ = ax.legend()
+        try:
+            for i, ax in zip(sorted(cbvs.cbvs.keys()), axar):
+                _ = ax.plot(cbvs.theta[i], self.posterior_pdf[i], 'k-')
+                # draw a vertical line for the max of each PDF
+                _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--', label="prior")
+                _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--', label="cond")
+                _ = ax.axvline(self.posterior_peak_theta[i], color='green', ls='--', label="post")
+                #_ = ax.set_xlabel('Theta')
+                #_ = ax.set_ylabel('Arbitrary units')
+                _ = ax.legend()
 
-        fig.tight_layout()
+            fig.tight_layout()
+        except Exception:
+            print("Prior plotting failed for star {self.tus_id}")
+
         fig.savefig(f"{self.direc}/posterior_pdfs_star{self.tus_id:06d}.png")
         fig.clf()
         plt.close()
