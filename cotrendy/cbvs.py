@@ -6,7 +6,7 @@ import sys
 import traceback
 from datetime import datetime
 from functools import partial
-from multiprocessing import Pool
+from multiprocessing import Pool, Lock
 from collections import defaultdict
 import numpy as np
 #from scipy.stats import pearsonr
@@ -683,8 +683,11 @@ class CBVs():
         # make an empty array for holding the correction
         correction = np.empty((len(target_ids), n_data_points))
 
+        # multiprocessing lock
+        lock = Lock()
+
         # collect together constants for giving to pool
-        const = (catalog, self)
+        const = (catalog, self, lock)
 
         # make a partial function with the constants baked in
         fn = partial(worker_fn, constants=const)
@@ -734,7 +737,7 @@ def worker_fn(star_id, constants):
     start = datetime.utcnow()
 
     # unpack constants
-    catalog, cbvs = constants
+    catalog, cbvs, lock = constants
 
     try:
         mapp = MAP(catalog, cbvs, star_id)
@@ -748,9 +751,9 @@ def worker_fn(star_id, constants):
 
     # make plots for the test stars
     if star_id in cbvs.test_stars or cbvs.debug:
-        mapp.plot_prior_pdf(cbvs)
-        mapp.plot_conditional_pdf(cbvs)
-        mapp.plot_posterior_pdf(cbvs)
+        mapp.plot_prior_pdf(cbvs, lock)
+        mapp.plot_conditional_pdf(cbvs, lock)
+        mapp.plot_posterior_pdf(cbvs, lock)
         # pickle the MAP object also for inspection
         tic_id = int(catalog.ids[star_id])
         map_filename = f"{cbvs.direc}/TIC-{tic_id}_map.pkl"
