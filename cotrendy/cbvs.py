@@ -20,7 +20,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import jastro.lightcurves as jlc
 from cotrendy.map import MAP
 from cotrendy.utils import picklify
-import globalconf
+import cotrendy.globalconf as gcnf
 
 # pylint: disable=invalid-name
 
@@ -735,7 +735,7 @@ class CBVs():
 
 # multiprocessing initialiser
 def init(l):
-    globalconf.lock = l
+    gcnf.lock = l
 
 # multiprocessing worker function
 def worker_fn(star_id, constants):
