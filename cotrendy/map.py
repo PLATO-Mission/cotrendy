@@ -417,7 +417,7 @@ class MAP():
         kde = gaussian_kde(x, weights=weights)
         return kde.evaluate(x_grid)
 
-    def plot_prior_pdf(self, cbvs, lock):
+    def plot_prior_pdf(self, cbvs):
         """
         Plot a histogram of the coeffs, then over plot the
         generated weighted PDF
@@ -467,7 +467,7 @@ class MAP():
             plt.close()
             gc.collect()
 
-    def plot_conditional_pdf(self, cbvs, lock):
+    def plot_conditional_pdf(self, cbvs):
         """
         Plot the conditional PDF and overplot the maximum
 
@@ -503,7 +503,7 @@ class MAP():
             plt.close()
             gc.collect()
 
-    def plot_posterior_pdf(self, cbvs, lock):
+    def plot_posterior_pdf(self, cbvs):
         """
         Plot the posterior PDF
 

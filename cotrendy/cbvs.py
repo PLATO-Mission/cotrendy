@@ -683,17 +683,23 @@ class CBVs():
         # make an empty array for holding the correction
         correction = np.empty((len(target_ids), n_data_points))
 
-        # multiprocessing lock
-        lock = Lock()
-
         # collect together constants for giving to pool
-        const = (catalog, self, lock)
+        const = (catalog, self)
+
+        # the old way with no thread locking
 
         # make a partial function with the constants baked in
-        fn = partial(worker_fn, constants=const)
+        #fn = partial(worker_fn, constants=const)
+        # run a pool of N workers and set them detrending
+        #with Pool(self.pool_size) as pool:
+        #    results = pool.map(fn, target_ids)
 
-        # run a pool of 6 workers and set them detrending
-        with Pool(self.pool_size) as pool:
+        # this is the new way with thread locking
+
+        # multiprocessing lock
+        l = Lock()
+        fn = partial(worker_fn, constants=const)
+        with Pool(self.pool_size, initializer=init, initargs=(l,)) as pool:
             results = pool.map(fn, target_ids)
 
         # collect the results and make a correction array
@@ -726,6 +732,11 @@ class CBVs():
         self.cotrending_flux_array = np.array(cotrending_flux_array)
         self.cotrended_flux_array = self.norm_flux_array - self.cotrending_flux_array
 
+# multiprocessing initialiser
+def init(l):
+    global lock
+    lock = l
+
 # multiprocessing worker function
 def worker_fn(star_id, constants):
     """
@@ -737,7 +748,7 @@ def worker_fn(star_id, constants):
     start = datetime.utcnow()
 
     # unpack constants
-    catalog, cbvs, lock = constants
+    catalog, cbvs = constants
 
     try:
         mapp = MAP(catalog, cbvs, star_id)
@@ -751,9 +762,9 @@ def worker_fn(star_id, constants):
 
     # make plots for the test stars
     if star_id in cbvs.test_stars or cbvs.debug:
-        mapp.plot_prior_pdf(cbvs, lock)
-        mapp.plot_conditional_pdf(cbvs, lock)
-        mapp.plot_posterior_pdf(cbvs, lock)
+        mapp.plot_prior_pdf(cbvs)
+        mapp.plot_conditional_pdf(cbvs)
+        mapp.plot_posterior_pdf(cbvs)
         # pickle the MAP object also for inspection
         tic_id = int(catalog.ids[star_id])
         map_filename = f"{cbvs.direc}/TIC-{tic_id}_map.pkl"
