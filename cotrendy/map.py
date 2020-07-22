@@ -40,7 +40,7 @@ class MAP():
         """
         self.tus_id = tus_id
         self.direc = cbvs.direc
-        self.id = catalog.ids[tus_id]
+        self.id = int(catalog.ids[tus_id])
 
         # prior PDF
         self.distances = None
