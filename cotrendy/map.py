@@ -11,6 +11,7 @@ from scipy.signal import periodogram
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import globalconf
 
 # pylint: disable=invalid-name
 
@@ -430,7 +431,7 @@ class MAP():
         cbvs : CBVs object
             Contains information about the basis vectors
         """
-        with lock:
+        with globalconf.lock:
             fig, axar = plt.subplots(len(cbvs.cbvs.keys()), figsize=(10, 10))
 
             # make the axis a list if there is only one
@@ -476,7 +477,7 @@ class MAP():
         cbvs : CBVs object
             Contains information about the basis vectors
         """
-        with lock:
+        with globalconf.lock:
             fig, axar = plt.subplots(len(cbvs.cbvs.keys()), figsize=(10, 10))
             if len(cbvs.cbvs.keys()) == 1:
                 axar = [axar]
@@ -512,7 +513,7 @@ class MAP():
         cbvs : CBVs object
             Contains information about the basis vectors
         """
-        with lock:
+        with globalconf.lock:
             fig, axar = plt.subplots(len(cbvs.cbvs.keys()), figsize=(10, 10))
             if len(cbvs.cbvs.keys()) == 1:
                 axar = [axar]
