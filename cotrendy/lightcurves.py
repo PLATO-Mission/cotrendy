@@ -6,7 +6,7 @@ import numpy as np
 from scipy.stats import median_absolute_deviation
 import cotrendy.utils as cuts
 
-def load_photometry(config, apply_mask=True):
+def load_photometry(config, apply_object_mask=True):
     """
     Read in a photometry file
 
@@ -14,7 +14,7 @@ def load_photometry(config, apply_mask=True):
     ----------
     config : dict
         Configuration file loaded via TOML
-    apply_mask : boolean
+    apply_object_mask : boolean
         Mask our a subset of stars?
 
     Returns
@@ -50,7 +50,7 @@ def load_photometry(config, apply_mask=True):
         print("Data arrays have mismatched shapes...")
 
     # now apply the mask if needed
-    if apply_mask:
+    if apply_object_mask:
         objects_mask_file = config['data']['objects_mask_file']
         mask = cuts.depicklify(f"{root}/{objects_mask_file}")
         fluxes = fluxes[mask]

@@ -14,7 +14,7 @@ class Catalog():
     """
     External information on the targets to detrend
     """
-    def __init__(self, config, apply_mask=True):
+    def __init__(self, config, apply_object_mask):
         """
         Initialise the class
 
@@ -36,9 +36,9 @@ class Catalog():
         self.ra_weight = float(config['catalog']['dim_weights'][0])
         self.dec_weight = float(config['catalog']['dim_weights'][1])
         self.mag_weight = float(config['catalog']['dim_weights'][2])
-        self.load_catalog(config, apply_mask)
+        self.load_catalog(config, apply_object_mask)
 
-    def load_catalog(self, cfg, apply_mask):
+    def load_catalog(self, cfg, apply_object_mask):
         """
         Load the RA, Dec and Gaia G mag from the input catalog
         """
@@ -57,7 +57,7 @@ class Catalog():
         ids = cat[3]
 
         # mask the catalog if required
-        if apply_mask:
+        if apply_object_mask:
             objects_mask_file = cfg['data']['objects_mask_file']
             mask_file = f"{path}/{objects_mask_file}"
             mask = cuts.depicklify(mask_file)
