@@ -24,6 +24,9 @@ class MAP():
 
     PDFs and parameters are indexed by CBV_id
     """
+
+    # TODO: Break all coeffs out into config file
+
     def __init__(self, catalog, cbvs, tus_id):
         """
         Initialise the MAP class
@@ -54,6 +57,9 @@ class MAP():
         self.prior_sigma_mask = None
         self.prior_general_goodness = 0.
         self.prior_noise_goodness = 0.
+        self.prior_weight = 0.
+        self.prior_weight_pt_var = 0.
+        self.prior_weight_pt_gen_good = 0.
 
         # conditioanl PDF
         self.cond_pdf = defaultdict(np.array)
@@ -62,7 +68,6 @@ class MAP():
         self.cond_max_success = defaultdict(bool)
 
         # posterior PDF
-        self.posterior_prior_weight = 0.
         self.posterior_pdf = defaultdict(np.array)
         self.posterior_peak_theta = defaultdict(list)
         self.posterior_peak_pdf = defaultdict(list)
@@ -178,8 +183,12 @@ class MAP():
             sigma_fit_coeffs = cbvs.fit_coeffs[cbv_id][self.prior_sigma_mask]
             self.prior_sigma[cbv_id] = np.std(sigma_fit_coeffs)
 
-        self.prior_goodness, _ = self.calculate_prior_goodness(cbvs)
-        self.prior_weight = self.calculate_prior_weight(cbvs)
+        self.prior_general_goodness, self.prior_noise_goodness = self.calculate_prior_goodness(cbvs)
+        self.prior_weight, self.prior_weight_pt_var, self.prior_weight_pt_gen_good = self.calculate_prior_weight(cbvs)
+
+        # here we reset the prior weight to 0 if the prior goodness < 0.01
+        if self.prior_general_goodness < 0.01:
+            self.prior_weight = 0.00
 
 
     def calculate_prior_goodness(self, cbvs):
@@ -297,18 +306,20 @@ class MAP():
         # can actually be fit worse using the prior information
         if cbvs.variability[self.tus_id] < cbvs.prior_normalised_variability_limit:
             prior_weight = 0.0
+            part_var = 0.0
+            part_gen_goodness = 0.0
         else:
             # calculate the variability part
             # TODO: pull out this scaling coeff. Why is is 2 in Kepler PDC?
-            prior_pdf_variability_weight = 2.0
-            variability_part = (1 + cbvs.variability[self.tus_id])**prior_pdf_variability_weight
+            prior_pdf_variability_weight = 2.5
+            part_var = (1 + cbvs.variability[self.tus_id])**prior_pdf_variability_weight
 
             # calculate the prior goodness part
-            prior_goodness_gain = 1.0
+            prior_goodness_gain = 1.5
             prior_goodness_weight = 1.0
-            prior_goodness_part = prior_goodness_gain * (self.prior_goodness**prior_goodness_weight)
-            prior_weight = variability_part * prior_goodness_part
-        return prior_weight
+            part_gen_goodness = prior_goodness_gain * (self.prior_general_goodness**prior_goodness_weight)
+            prior_weight = part_var * part_gen_goodness
+        return prior_weight, part_var, part_gen_goodness
 
     def calculate_posterior_pdfs(self, cbvs):
         """
