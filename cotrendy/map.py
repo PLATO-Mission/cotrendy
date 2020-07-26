@@ -441,9 +441,9 @@ class MAP():
             try:
                 for i, ax in zip(sorted(cbvs.cbvs.keys()), axar):
                     # only plot the middle 96% of the objects, like the kepler plots
-                    sorted_coeffs = sorted(cbvs.fit_coeffs[i])
-                    llim = int(np.ceil(len(sorted_coeffs)*0.02))
-                    ulim = int(np.ceil(len(sorted_coeffs)*0.98))
+                    sorted_coeffs = sorted(cbvs.fit_coeffs[i][self.prior_mask])
+                    llim = int(np.ceil(len(sorted_coeffs)*0.05))
+                    ulim = int(np.ceil(len(sorted_coeffs)*0.95))
 
                     # make the plot
                     _ = ax.hist(sorted_coeffs[llim:ulim], bins=self.hist_bins,
