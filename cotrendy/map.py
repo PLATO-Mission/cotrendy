@@ -44,6 +44,7 @@ class MAP():
         self.tus_id = tus_id
         self.direc = cbvs.direc
         self.id = int(catalog.ids[tus_id])
+        self.mag = round(catalog.mag[tus_id], 2)
 
         # prior PDF
         self.distances = None
@@ -451,6 +452,8 @@ class MAP():
 
             try:
                 for i, ax in zip(sorted(cbvs.cbvs.keys()), axar):
+                    if i == 0:
+                        _ = ax.set_title('Mag: {self.mag} Var: {cbvs.variability[self.tus_id]:.3f} Prior Wt: {self.prior_weight:.3f} [{self.prior_weight_pt_var:.3f}:{self.prior_weight_pt_gen_good}] Prior Gdness: {self.prior_general_goodness:.3f} [{self.prior_noise_goodness:.3f}]')
                     # only plot the middle 96% of the objects, like the kepler plots
                     sorted_coeffs = sorted(cbvs.fit_coeffs[i][self.prior_mask])
                     llim = int(np.ceil(len(sorted_coeffs)*0.05))
@@ -495,6 +498,8 @@ class MAP():
 
             try:
                 for i, ax in zip(sorted(cbvs.cbvs.keys()), axar):
+                    if i == 0:
+                        _ = ax.set_title('Mag: {self.mag} Var: {cbvs.variability[self.tus_id]:.3f} Prior Wt: {self.prior_weight:.3f} [{self.prior_weight_pt_var:.3f}:{self.prior_weight_pt_gen_good}] Prior Gdness: {self.prior_general_goodness:.3f} [{self.prior_noise_goodness:.3f}]')
                     # draw a vertical line for the max of each PDF
                     _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--', label="prior")
                     _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--', label="cond")
@@ -531,6 +536,8 @@ class MAP():
 
             try:
                 for i, ax in zip(sorted(cbvs.cbvs.keys()), axar):
+                    if i == 0:
+                        _ = ax.set_title('Mag: {self.mag} Var: {cbvs.variability[self.tus_id]:.3f} Prior Wt: {self.prior_weight:.3f} [{self.prior_weight_pt_var:.3f}:{self.prior_weight_pt_gen_good}] Prior Gdness: {self.prior_general_goodness:.3f} [{self.prior_noise_goodness:.3f}]')
                     _ = ax.plot(cbvs.theta[i], self.posterior_pdf[i], 'k-')
                     # draw a vertical line for the max of each PDF
                     _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--', label="prior")
