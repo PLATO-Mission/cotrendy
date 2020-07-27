@@ -6,7 +6,7 @@ import sys
 import traceback
 from datetime import datetime
 from functools import partial
-from multiprocessing import Pool, Lock
+from multiprocessing import Pool
 from collections import defaultdict
 import numpy as np
 #from scipy.stats import pearsonr
@@ -20,7 +20,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import jastro.lightcurves as jlc
 from cotrendy.map import MAP
 from cotrendy.utils import picklify
-import cotrendy.globalconf as gcnf
+#import cotrendy.globalconf as gcnf
 
 # pylint: disable=invalid-name
 
@@ -687,21 +687,20 @@ class CBVs():
         # collect together constants for giving to pool
         const = (catalog, self)
 
-        # the old way with no thread locking
-
+        # the old way of plotting with no thread locking
+        # however, we just plot with a different script now for speed
         # make a partial function with the constants baked in
-        #fn = partial(worker_fn, constants=const)
-        # run a pool of N workers and set them detrending
-        #with Pool(self.pool_size) as pool:
-        #    results = pool.map(fn, target_ids)
-
-        # this is the new way with thread locking
-
-        # multiprocessing lock
-        l = Lock()
         fn = partial(worker_fn, constants=const)
-        with Pool(self.pool_size, initializer=init, initargs=(l,)) as pool:
+        # run a pool of N workers and set them detrending
+        with Pool(self.pool_size) as pool:
             results = pool.map(fn, target_ids)
+
+        # this is the new way of plotting with thread locking
+        # multiprocessing lock
+        #l = Lock()
+        #fn = partial(worker_fn, constants=const)
+        #with Pool(self.pool_size, initializer=init, initargs=(l,)) as pool:
+        #    results = pool.map(fn, target_ids)
 
         # collect the results and make a correction array
         for r, c in results:
@@ -734,8 +733,8 @@ class CBVs():
         self.cotrended_flux_array = self.norm_flux_array - self.cotrending_flux_array
 
 # multiprocessing initialiser
-def init(l):
-    gcnf.lock = l
+#def init(l):
+#    gcnf.lock = l
 
 # multiprocessing worker function
 def worker_fn(star_id, constants):
@@ -762,9 +761,7 @@ def worker_fn(star_id, constants):
 
     # make plots for the test stars
     if star_id in cbvs.test_stars or cbvs.debug:
-        mapp.plot_prior_pdf(cbvs)
-        mapp.plot_conditional_pdf(cbvs)
-        mapp.plot_posterior_pdf(cbvs)
+        # debug plotting moved out of the main script
         # pickle the MAP object also for inspection
         tic_id = int(catalog.ids[star_id])
         map_filename = f"{cbvs.direc}/TIC-{tic_id}_map.pkl"
@@ -773,24 +770,6 @@ def worker_fn(star_id, constants):
     # try to use our super duper new posterior PDF
     correction_to_apply = []
     for cbv_id in sorted(cbvs.cbvs.keys()):
-        #sigma = mapp.prior_sigma[cbv_id]
-        #cond_peak_theta = mapp.cond_peak_theta[cbv_id]
-        #prior_peak_theta = mapp.prior_peak_theta[cbv_id]
-        #prior_cond_diff = abs(prior_peak_theta-cond_peak_theta)
-        #
-        ## so for simplicity here, we do the following
-        ## if the star is > variability_limit and the conditional
-        ## is > 5 sigma from the prior, this indicates a bad fit
-        ## use the prior. Else just use the conditional fit
-        #if cbvs.variability[star_id] > 3*cbvs.normalised_variability_limit and \
-        #    prior_cond_diff > 5*sigma:
-        #    best_theta = prior_peak_theta
-        #else:
-        #    best_theta = cond_peak_theta
-        #
-        #component = cbvs.cbvs[cbv_id]*best_theta
-        #correction_to_apply.append(component)
-
         # uses the newly added posterior peak theta, which should weight the prior info
         component = cbvs.cbvs[cbv_id]*mapp.posterior_peak_theta[cbv_id]
         correction_to_apply.append(component)
