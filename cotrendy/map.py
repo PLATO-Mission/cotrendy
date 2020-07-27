@@ -1,17 +1,12 @@
 """
 MAP components for Cotrendy
 """
-import gc
 from collections import defaultdict
 import numpy as np
 from scipy.stats import gaussian_kde
 from scipy.integrate import simps
 from scipy.stats import median_absolute_deviation as mad
 from scipy.signal import periodogram
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-#import cotrendy.globalconf as gcnf
 
 # pylint: disable=invalid-name
 
@@ -312,11 +307,11 @@ class MAP():
         else:
             # calculate the variability part
             # TODO: pull out this scaling coeff. Why is is 2 in Kepler PDC?
-            prior_pdf_variability_weight = 2.5
+            prior_pdf_variability_weight = 3.0
             part_var = (1 + cbvs.variability[self.tus_id])**prior_pdf_variability_weight
 
             # calculate the prior goodness part
-            prior_goodness_gain = 1.5
+            prior_goodness_gain = 2.0
             prior_goodness_weight = 1.0
             part_gen_goodness = prior_goodness_gain * (self.prior_general_goodness**prior_goodness_weight)
             prior_weight = part_var * part_gen_goodness
@@ -430,128 +425,3 @@ class MAP():
         kde = gaussian_kde(x, weights=weights)
         return kde.evaluate(x_grid)
 
-    def plot_prior_pdf(self, cbvs):
-        """
-        Plot a histogram of the coeffs, then over plot the
-        generated weighted PDF
-
-        Call this function with the same coeffs used to generate the
-        weighted prior PDF otherwise it doesn't make sense
-
-        Parameters
-        ----------
-        cbvs : CBVs object
-            Contains information about the basis vectors
-        """
-        #with gcnf.lock:
-        fig, axar = plt.subplots(len(cbvs.cbvs.keys()), figsize=(10, 10))
-
-        # make the axis a list if there is only one
-        if len(cbvs.cbvs.keys()) == 1:
-            axar = [axar]
-
-        try:
-            _ = fig.suptitle(f'Mag: {self.mag} Var: {cbvs.variability[self.tus_id]:.3f} Prior Wt: {self.prior_weight:.3f} [{self.prior_weight_pt_var:.3f}:{self.prior_weight_pt_gen_good:.3f}] Prior Gdness: {self.prior_general_goodness:.3f} [{self.prior_noise_goodness:.3f}]')
-            for i, ax in zip(sorted(cbvs.cbvs.keys()), axar):
-                # only plot the middle 96% of the objects, like the kepler plots
-                sorted_coeffs = sorted(cbvs.fit_coeffs[i][self.prior_mask])
-                llim = int(np.ceil(len(sorted_coeffs)*0.02))
-                ulim = int(np.ceil(len(sorted_coeffs)*0.98))
-
-                # make the plot
-                _ = ax.hist(sorted_coeffs[llim:ulim], bins=self.hist_bins,
-                            density=True, label='Theta Histogram')
-                # draw a vertical line for the max of each PDF
-                _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--', label="prior")
-                _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--', label="cond")
-                _ = ax.axvline(self.posterior_peak_theta[i], color='green', ls='--', label="post")
-                label = f"Theta PDFw ({self.prior_peak_theta[i]:.4f})"
-                _ = ax.plot(cbvs.theta[i], self.prior_pdf[i], 'r-',
-                            label=label)
-                #_ = ax.set_xlabel('Theta')
-                #_ = ax.set_ylabel('Frequency')
-                _ = ax.legend()
-
-            fig.tight_layout()
-            fig.subplots_adjust(top=0.95)
-        except Exception:
-            print("Prior plotting failed for star {self.tus_id}")
-
-        fig.savefig(f"{self.direc}/TIC-{self.id}_prior_pdfs.png")
-        fig.clf()
-        plt.close()
-        gc.collect()
-
-    def plot_conditional_pdf(self, cbvs):
-        """
-        Plot the conditional PDF and overplot the maximum
-
-        Parameters
-        ----------
-        cbvs : CBVs object
-            Contains information about the basis vectors
-        """
-        #with gcnf.lock:
-        fig, axar = plt.subplots(len(cbvs.cbvs.keys()), figsize=(10, 10))
-        if len(cbvs.cbvs.keys()) == 1:
-            axar = [axar]
-
-        try:
-            _ = fig.suptitle(f'Mag: {self.mag} Var: {cbvs.variability[self.tus_id]:.3f} Prior Wt: {self.prior_weight:.3f} [{self.prior_weight_pt_var:.3f}:{self.prior_weight_pt_gen_good:.3f}] Prior Gdness: {self.prior_general_goodness:.3f} [{self.prior_noise_goodness:.3f}]')
-            for i, ax in zip(sorted(cbvs.cbvs.keys()), axar):
-                # draw a vertical line for the max of each PDF
-                _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--', label="prior")
-                _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--', label="cond")
-                _ = ax.axvline(self.posterior_peak_theta[i], color='green', ls='--', label="post")
-                label = f"Cond ({self.cond_peak_theta[i]:.4f})"
-                _ = ax.plot(cbvs.theta[i], self.cond_pdf[i], 'k-',
-                            label=label)
-                #_ = ax.set_xlabel('Theta')
-                #_ = ax.set_ylabel('Arbitrary units')
-                _ = ax.legend()
-
-            fig.tight_layout()
-            fig.subplots_adjust(top=0.95)
-        except Exception:
-            print("Prior plotting failed for star {self.tus_id}")
-
-        fig.savefig(f"{self.direc}/TIC-{self.id}_conditional_pdfs.png")
-        fig.clf()
-        plt.close()
-        gc.collect()
-
-    def plot_posterior_pdf(self, cbvs):
-        """
-        Plot the posterior PDF
-
-        Parameters
-        ----------
-        cbvs : CBVs object
-            Contains information about the basis vectors
-        """
-        #with gcnf.lock:
-        fig, axar = plt.subplots(len(cbvs.cbvs.keys()), figsize=(10, 10))
-        if len(cbvs.cbvs.keys()) == 1:
-            axar = [axar]
-
-        try:
-            _ = fig.suptitle(f'Mag: {self.mag} Var: {cbvs.variability[self.tus_id]:.3f} Prior Wt: {self.prior_weight:.3f} [{self.prior_weight_pt_var:.3f}:{self.prior_weight_pt_gen_good:.3f}] Prior Gdness: {self.prior_general_goodness:.3f} [{self.prior_noise_goodness:.3f}]')
-            for i, ax in zip(sorted(cbvs.cbvs.keys()), axar):
-                _ = ax.plot(cbvs.theta[i], self.posterior_pdf[i], 'k-')
-                # draw a vertical line for the max of each PDF
-                _ = ax.axvline(self.prior_peak_theta[i], color='blue', ls='--', label="prior")
-                _ = ax.axvline(self.cond_peak_theta[i], color='red', ls='--', label="cond")
-                _ = ax.axvline(self.posterior_peak_theta[i], color='green', ls='--', label="post")
-                #_ = ax.set_xlabel('Theta')
-                #_ = ax.set_ylabel('Arbitrary units')
-                _ = ax.legend()
-
-            fig.tight_layout()
-            fig.subplots_adjust(top=0.95)
-        except Exception:
-            print("Prior plotting failed for star {self.tus_id}")
-
-        fig.savefig(f"{self.direc}/TIC-{self.id}_posterior_pdfs.png")
-        fig.clf()
-        plt.close()
-        gc.collect()
