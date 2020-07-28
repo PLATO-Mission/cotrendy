@@ -695,13 +695,6 @@ class CBVs():
         with Pool(self.pool_size) as pool:
             results = pool.map(fn, target_ids)
 
-        # this is the new way of plotting with thread locking
-        # multiprocessing lock
-        #l = Lock()
-        #fn = partial(worker_fn, constants=const)
-        #with Pool(self.pool_size, initializer=init, initargs=(l,)) as pool:
-        #    results = pool.map(fn, target_ids)
-
         # collect the results and make a correction array
         for r, c in results:
             correction[r] = c
@@ -731,10 +724,6 @@ class CBVs():
         # finally cotrend the lightcurves
         self.cotrending_flux_array = np.array(cotrending_flux_array)
         self.cotrended_flux_array = self.norm_flux_array - self.cotrending_flux_array
-
-# multiprocessing initialiser
-#def init(l):
-#    gcnf.lock = l
 
 # multiprocessing worker function
 def worker_fn(star_id, constants):
@@ -770,8 +759,13 @@ def worker_fn(star_id, constants):
     # try to use our super duper new posterior PDF
     correction_to_apply = []
     for cbv_id in sorted(cbvs.cbvs.keys()):
-        # uses the newly added posterior peak theta, which should weight the prior info
-        component = cbvs.cbvs[cbv_id]*mapp.posterior_peak_theta[cbv_id]
+        # if MAP succeeded, use the posterior, else fall back to LS results
+        if mapp.all_max_success:
+            final_coeff = mapp.posterior_peak_theta[cbv_id]
+        else:
+            final_coeff = cbvs.fit_coeffs[cbv_id][star_id]
+
+        component = cbvs.cbvs[cbv_id]*final_coeff
         correction_to_apply.append(component)
 
     # sum up the scaled CBVs then do the correction

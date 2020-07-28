@@ -90,6 +90,7 @@ class MAP():
         # take some notes on the success of maximising the PDFs
         self.all_max_success = False
         failures = 0
+        self.mode = "MAP"
         # check if any maximising failed
         for cbv_id in sorted(cbvs.cbvs.keys()):
             if not self.prior_max_success[cbv_id] or not self.cond_max_success[cbv_id] or not \
@@ -97,6 +98,7 @@ class MAP():
                 failures += 1
         if failures == 0:
             self.all_max_success = True
+            self.mode = "LS"
 
     def calculate_prior_pdfs(self, catalog, cbvs):
         """
@@ -185,6 +187,7 @@ class MAP():
         # here we reset the prior weight to 0 if the prior goodness < 0.01
         if self.prior_general_goodness < 0.01:
             self.prior_weight = 0.00
+            self.mode = "LS"
 
 
     def calculate_prior_goodness(self, cbvs):
@@ -307,12 +310,12 @@ class MAP():
         else:
             # calculate the variability part
             # TODO: pull out this scaling coeff. Why is is 2 in Kepler PDC?
-            prior_pdf_variability_weight = 3.0
+            prior_pdf_variability_weight = 3.5
             part_var = (1 + cbvs.variability[self.tus_id])**prior_pdf_variability_weight
 
             # calculate the prior goodness part
             prior_goodness_gain = 2.0
-            prior_goodness_weight = 1.0
+            prior_goodness_weight = 0.5
             part_gen_goodness = prior_goodness_gain * (self.prior_general_goodness**prior_goodness_weight)
             prior_weight = part_var * part_gen_goodness
         return prior_weight, part_var, part_gen_goodness
