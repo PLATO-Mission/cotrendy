@@ -90,7 +90,7 @@ class MAP():
         # take some notes on the success of maximising the PDFs
         self.all_max_success = False
         failures = 0
-        self.mode = "MAP"
+        self.mode = "LS"
         # check if any maximising failed
         for cbv_id in sorted(cbvs.cbvs.keys()):
             if not self.prior_max_success[cbv_id] or not self.cond_max_success[cbv_id] or not \
@@ -98,7 +98,7 @@ class MAP():
                 failures += 1
         if failures == 0:
             self.all_max_success = True
-            self.mode = "LS"
+            self.mode = "MAP"
 
     def calculate_prior_pdfs(self, catalog, cbvs):
         """
