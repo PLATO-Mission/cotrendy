@@ -42,8 +42,7 @@ class MAP():
         self.mag = round(catalog.mag[tus_id], 2)
 
         # overall flags for MAP
-        self.all_max_success = False
-        self.mode = "LS"
+        self.mode = "MAP"
 
         # prior PDF
         self.distances = None
@@ -92,9 +91,7 @@ class MAP():
         # ignore the rest of the MAP analysis
         if self.prior_general_goodness < 0.01 or \
                 cbvs.variability[self.tus_id] < cbvs.prior_normalised_variability_limit:
-            self.prior_weight = 0.00
-            self.prior_weight_pt_var = 0.00
-            self.prior_weight_pt_gen_good = 0.00
+            self.mode = "LS"
             # we stop here and MAP defaults to LS
         else:
             self.calculate_conditional_pdfs(cbvs)
@@ -108,9 +105,8 @@ class MAP():
                 if not self.prior_max_success[cbv_id] or not self.cond_max_success[cbv_id] or not \
                     self.posterior_max_success[cbv_id]:
                     failures += 1
-            if failures == 0:
-                self.all_max_success = True
-                self.mode = "MAP"
+            if failures > 0:
+                self.mode = "LS"
 
     def calculate_prior_pdfs(self, catalog, cbvs):
         """

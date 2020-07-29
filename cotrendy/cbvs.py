@@ -760,7 +760,7 @@ def worker_fn(star_id, constants):
     correction_to_apply = []
     for cbv_id in sorted(cbvs.cbvs.keys()):
         # if MAP succeeded, use the posterior, else fall back to LS results
-        if mapp.all_max_success:
+        if mapp.mode == "MAP":
             final_coeff = mapp.posterior_peak_theta[cbv_id]
         else:
             final_coeff = cbvs.fit_coeffs[cbv_id][star_id]
