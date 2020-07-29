@@ -41,6 +41,10 @@ class MAP():
         self.id = int(catalog.ids[tus_id])
         self.mag = round(catalog.mag[tus_id], 2)
 
+        # overall flags for MAP
+        self.all_max_success = False
+        self.mode = "LS"
+
         # prior PDF
         self.distances = None
         self.prior_sigma = defaultdict(float)
@@ -82,23 +86,31 @@ class MAP():
 
         # calculate the PDFs
         self.calculate_prior_pdfs(catalog, cbvs)
-        self.calculate_conditional_pdfs(cbvs)
 
-        # finally combine the PDFs above into the posterior and maximise
-        self.calculate_posterior_pdfs(cbvs)
+        # analyse the info we have, if the prior_goodness is poor
+        # or the star is quiet, break back to a pure LS fit and
+        # ignore the rest of the MAP analysis
+        if self.prior_general_goodness < 0.01 or \
+                cbvs.variability[self.tus_id] < cbvs.prior_normalised_variability_limit:
+            self.prior_weight = 0.00
+            self.prior_weight_pt_var = 0.00
+            self.prior_weight_pt_gen_good = 0.00
+            # we stop here and MAP defaults to LS
+        else:
+            self.calculate_conditional_pdfs(cbvs)
 
-        # take some notes on the success of maximising the PDFs
-        self.all_max_success = False
-        failures = 0
-        self.mode = "LS"
-        # check if any maximising failed
-        for cbv_id in sorted(cbvs.cbvs.keys()):
-            if not self.prior_max_success[cbv_id] or not self.cond_max_success[cbv_id] or not \
-                self.posterior_max_success[cbv_id]:
-                failures += 1
-        if failures == 0:
-            self.all_max_success = True
-            self.mode = "MAP"
+            # finally combine the PDFs above into the posterior and maximise
+            self.calculate_posterior_pdfs(cbvs)
+
+            failures = 0
+            # check if any maximising failed
+            for cbv_id in sorted(cbvs.cbvs.keys()):
+                if not self.prior_max_success[cbv_id] or not self.cond_max_success[cbv_id] or not \
+                    self.posterior_max_success[cbv_id]:
+                    failures += 1
+            if failures == 0:
+                self.all_max_success = True
+                self.mode = "MAP"
 
     def calculate_prior_pdfs(self, catalog, cbvs):
         """
@@ -183,12 +195,6 @@ class MAP():
 
         self.prior_general_goodness, self.prior_noise_goodness = self.calculate_prior_goodness(cbvs)
         self.prior_weight, self.prior_weight_pt_var, self.prior_weight_pt_gen_good = self.calculate_prior_weight(cbvs)
-
-        # here we reset the prior weight to 0 if the prior goodness < 0.01
-        if self.prior_general_goodness < 0.01:
-            self.prior_weight = 0.00
-            self.mode = "LS"
-
 
     def calculate_prior_goodness(self, cbvs):
         """
@@ -300,24 +306,16 @@ class MAP():
         """
         Calculate the weighting of the prior information for the posterior PDF
         """
-        # check if the normalised variability is < 0.5
-        # if so set the prior weight to 0. Such quiet targets
-        # can actually be fit worse using the prior information
-        if cbvs.variability[self.tus_id] < cbvs.prior_normalised_variability_limit:
-            prior_weight = 0.0
-            part_var = 0.0
-            part_gen_goodness = 0.0
-        else:
-            # calculate the variability part
-            # TODO: pull out this scaling coeff. Why is is 2 in Kepler PDC?
-            prior_pdf_variability_weight = 3.5
-            part_var = (1 + cbvs.variability[self.tus_id])**prior_pdf_variability_weight
+        # calculate the variability part
+        # TODO: pull out this scaling coeff. Why is is 2 in Kepler PDC?
+        prior_pdf_variability_weight = 3.5
+        part_var = (1 + cbvs.variability[self.tus_id])**prior_pdf_variability_weight
 
-            # calculate the prior goodness part
-            prior_goodness_gain = 2.0
-            prior_goodness_weight = 0.5
-            part_gen_goodness = prior_goodness_gain * (self.prior_general_goodness**prior_goodness_weight)
-            prior_weight = part_var * part_gen_goodness
+        # calculate the prior goodness part
+        prior_goodness_gain = 2.0
+        prior_goodness_weight = 0.5
+        part_gen_goodness = prior_goodness_gain * (self.prior_general_goodness**prior_goodness_weight)
+        prior_weight = part_var * part_gen_goodness
         return prior_weight, part_var, part_gen_goodness
 
     def calculate_posterior_pdfs(self, cbvs):
