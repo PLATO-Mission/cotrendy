@@ -89,7 +89,7 @@ class MAP():
         # analyse the info we have, if the prior_goodness is poor
         # or the star is quiet, break back to a pure LS fit and
         # ignore the rest of the MAP analysis
-        if self.prior_general_goodness < 0.01 or \
+        if self.prior_general_goodness < 0.1 or \
                 cbvs.variability[self.tus_id] < cbvs.prior_normalised_variability_limit:
             self.mode = "LS"
             # we stop here and MAP defaults to LS
@@ -304,11 +304,11 @@ class MAP():
         """
         # calculate the variability part
         # TODO: pull out this scaling coeff. Why is is 2 in Kepler PDC?
-        prior_pdf_variability_weight = 3.5
+        prior_pdf_variability_weight = 2.0
         part_var = (1 + cbvs.variability[self.tus_id])**prior_pdf_variability_weight
 
         # calculate the prior goodness part
-        prior_goodness_gain = 2.0
+        prior_goodness_gain = 1.0
         prior_goodness_weight = 0.5
         part_gen_goodness = prior_goodness_gain * (self.prior_general_goodness**prior_goodness_weight)
         prior_weight = part_var * part_gen_goodness
