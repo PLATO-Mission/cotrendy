@@ -15,6 +15,8 @@ name = "James McCormac"
 version = "0.0.1"
 
 [global]
+# enable debugging mode?
+debug = true
 # working directory
 root = "/tess/photometry/tessFFIextract/lightcurves/S05_1-1"
 # time slot identifier, quarter, night etc
