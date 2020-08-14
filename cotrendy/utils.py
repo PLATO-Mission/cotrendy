@@ -49,7 +49,7 @@ def picklify(pickle_file, pickle_object):
     None
     """
     of = open(pickle_file, 'wb')
-    pickle.dump(pickle_object, of)
+    pickle.dump(pickle_object, of, protocol=4)
     of.close()
 
 def depicklify(pickle_file):
