@@ -335,7 +335,7 @@ class MAP():
                 peak_theta = self.cond_peak_theta[cbv_id]
                 peak_pdf = self.cond_peak_pdf[cbv_id]
             else:
-                posterior = self.cond_pdf[cbv_id] + self.prior_pdf[cbv_id]*self.prior_weight
+                posterior = self.cond_pdf[cbv_id] + np.log(self.prior_pdf[cbv_id])*self.prior_weight
                 self.posterior_pdf[cbv_id] = posterior
                 peak_theta, peak_pdf = self._maximise_pdf(cbvs.theta[cbv_id],
                                                           posterior,
