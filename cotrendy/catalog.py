@@ -29,6 +29,7 @@ class Catalog():
         ------
         None
         """
+        self.coords_units = None
         self.ra = None
         self.dec = None
         self.mag = None
@@ -45,6 +46,11 @@ class Catalog():
         try:
             path = cfg['global']['root']
             filename = cfg['catalog']['input_cat_file']
+            # this can be pixels for CCD coords or degrees for RA/Dec
+            # if pixels, ra is X and dec is Y by default
+            # the actual units don't matter, but the RA correction below
+            # is wrong when pixels, so we distinuish them
+            coords_units = cfg['catalog']['coords_units']
         except Exception:
             print("Missing catalog info from configuration file")
             traceback.print_exc(file=sys.stdout)
@@ -66,12 +72,16 @@ class Catalog():
             mag = mag[mask]
             ids = ids[mask]
 
-        # check if RA spans 0h
-        min_ra = np.min(ra)
-        max_ra = np.max(ra)
-        diff_ra = max_ra - min_ra
-        if diff_ra > 180:
-            ra[ra > 180] -= 360
+        if coords_units == "deg":
+            # check if RA spans 0h
+            min_ra = np.min(ra)
+            max_ra = np.max(ra)
+            diff_ra = max_ra - min_ra
+            if diff_ra > 180:
+                ra[ra > 180] -= 360
+        else:
+            # do soemthing special to pixels coords, if necessary
+            pass # for now
 
         # store these for further use
         self.ra = ra
