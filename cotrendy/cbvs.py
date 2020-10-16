@@ -411,7 +411,7 @@ class CBVs():
 
         # plot the CBVs for everyone to see
         output_filename = f"{self.direc}/cbvs_{self.camera_id}.png"
-        fig, ax = plt.subplots(self.n_cbvs, figsize=(10, 10))
+        fig, ax = plt.subplots(self.n_cbvs+1, figsize=(10, 10))
         for i, cbv_id in enumerate(sorted(self.cbvs.keys())):
             ax[i].plot(self.cbvs[cbv_id], label=f'CBV {cbv_id}')
             ax[i].legend()
