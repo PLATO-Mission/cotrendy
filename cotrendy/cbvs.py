@@ -199,19 +199,22 @@ class CBVs():
         var_loc = np.where(self.variability > self.normalised_variability_limit)[0]
         self.variability_mask[var_loc] = 0.0
 
-        # set log V for plotting
-        logV = np.log10(self.variability)
+        try:
+            # set log V for plotting
+            logV = np.log10(self.variability)
 
-        fig, ax = plt.subplots(1)
-        ax.hist(logV, bins=100)
-        ax.axvline(np.log10(self.normalised_variability_limit), ls='--', color='red')
-        ax.set_xlabel('log(Normalised variability)')
-        ax.set_ylabel('Number')
-        fig.tight_layout()
-        fig.savefig(f"{self.direc}/variability_camera_{self.camera_id}_{self.phot_file}.pdf")
-        fig.clf()
-        plt.close()
-        gc.collect()
+            fig, ax = plt.subplots(1)
+            ax.hist(logV, bins=100)
+            ax.axvline(np.log10(self.normalised_variability_limit), ls='--', color='red')
+            ax.set_xlabel('log(Normalised variability)')
+            ax.set_ylabel('Number')
+            fig.tight_layout()
+            fig.savefig(f"{self.direc}/variability_camera_{self.camera_id}_{self.phot_file}.pdf")
+            fig.clf()
+            plt.close()
+            gc.collect()
+        except ValueError:
+            print('Catching odd error with making variability histogram. Skipping...')
 
     def calculate_pearson_correlation(self):
         """
