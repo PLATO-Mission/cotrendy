@@ -345,7 +345,7 @@ class CBVs():
         print(f"Matrix shapes -  U: {self.U.shape}, s: {self.s.shape}, VT: {self.VT.shape}")
 
         # plot the first 50 singular values against their index
-        output_filename = f"{self.direc}/singular_values_{self.camera_id}.png"
+        output_filename = f"{self.direc}/singular_values_{self.camera_id}_{self.phot_file}.png"
         fig, ax = plt.subplots(1, figsize=(5, 5))
         inds = np.arange(1, 51)
         ax.loglog(inds, self.s[:50], 'ko')
@@ -413,7 +413,7 @@ class CBVs():
         self.vect_store = np.array(vect_store)
 
         # plot the CBVs for everyone to see
-        output_filename = f"{self.direc}/cbvs_{self.camera_id}.png"
+        output_filename = f"{self.direc}/cbvs_{self.camera_id}_{self.phot_file}.png"
         fig, ax = plt.subplots(self.n_cbvs+1, figsize=(10, 10))
         for i, cbv_id in enumerate(sorted(self.cbvs.keys())):
             ax[i].plot(self.cbvs[cbv_id], label=f'CBV {cbv_id}')
