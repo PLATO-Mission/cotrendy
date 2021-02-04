@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import jastro.lightcurves as jlc
 from cotrendy.map import MAP
-from cotrendy.utils import picklify
+from cotrendy.utils import picklify, depicklify
 #import cotrendy.globalconf as gcnf
 
 # pylint: disable=invalid-name
@@ -106,7 +106,14 @@ class CBVs():
         # placeholder for normalise variability stats
         self.normalised_variability_limit = config['cotrend']['normalised_variability_limit']
         self.prior_normalised_variability_limit = config['cotrend']['prior_normalised_variability_limit']
-        self.variability = None
+
+        # check if we want to load externally calculated variability
+        # or do it on the fly. If it's empty we work it out, otherwise
+        # we just use the array from the pickle file
+        if config['data']['variability_file']:
+            self.variability = depicklify(config['data']['variability_file'])
+        else:
+            self.variability = None
 
         # placeholder for CBV domination checks
         # starts with ones, if a star dominates it
@@ -180,22 +187,25 @@ class CBVs():
         """
         print("Finding variable stars...")
 
-        sigma_y, delta_y = [], []
-        for target in self.targets:
-            delta_y.append(np.average(target.fluxerr_wtrend))
-            coeffs = np.polyfit(self.timesteps, target.flux_wtrend, 3)
-            besty = np.polyval(coeffs, self.timesteps)
-            # this was original flux_wtrend - besty, which seemed wrong
-            # as all the stars for CBVs were chosen as the fainest ones.
-            flattened = target.flux_wtrend - besty
-            sigma_y.append(np.std(flattened))
-        sigma_y = np.array(sigma_y)
-        delta_y = np.array(delta_y)
+        if self.variability is None:
+            print("Calculating normalised variability...")
+            sigma_y, delta_y = [], []
+            for target in self.targets:
+                delta_y.append(np.average(target.fluxerr_wtrend))
+                coeffs = np.polyfit(self.timesteps, target.flux_wtrend, 3)
+                besty = np.polyval(coeffs, self.timesteps)
+                # this was original flux_wtrend - besty, which seemed wrong
+                # as all the stars for CBVs were chosen as the fainest ones.
+                flattened = target.flux_wtrend - besty
+                sigma_y.append(np.std(flattened))
+            sigma_y = np.array(sigma_y)
+            delta_y = np.array(delta_y)
 
-        # calculate the normalised variability
-        V = sigma_y / delta_y
-        median_V = np.median(V)
-        self.variability = V / median_V
+            # calculate the normalised variability
+            V = sigma_y / delta_y
+            median_V = np.median(V)
+            self.variability = V / median_V
+
         var_loc = np.where(self.variability > self.normalised_variability_limit)[0]
         self.variability_mask[var_loc] = 0.0
 
@@ -236,58 +246,6 @@ class CBVs():
         unit_norm_flux = self.norm_flux_array / per_object_rms
         correlation_matrix = (unit_norm_flux @ unit_norm_flux.T) / n_cadences
         self.median_abs_correlations = np.median(np.abs(correlation_matrix), axis=0)
-
-    #def calculate_pearson_correlation_old(self):
-    #    """
-    #
-    #    *** DEPRECATED ***
-    #
-    #    Take the array of targets and find the most correlated
-    #
-    #    TODO: This is terrible code, fix this when happy with method!!!
-    #
-    #    # old method:
-    #    # NOTE: This original stat of median correlation is too basic for real data
-    #    # It is dominated by faint stars. We need to find those that highly correlate
-    #    # more carefully and then compare them to each other, take that as their correlation
-    #    # statistic. Finally when selecting the best ones, we want the top 50% of ONLY the
-    #    # good ones, not 50% of all of them!
-    #    #self.median_abs_correlations = np.array([np.median(self.correlations[i]) for i in self.correlations])
-    #    """
-    #
-    #    print("Finding correlated stars...")
-    #    n_stars_to_correlate = len(self.norm_flux_array)
-    #    self.high_correlation_mask = []
-    #
-    #    for j in range(0, n_stars_to_correlate):
-    #        print(f"{j+1}/{n_stars_to_correlate}")
-    #        for i in range(0, n_stars_to_correlate):
-    #            if i != j:
-    #                r = pearsonr(self.norm_flux_array[j], self.norm_flux_array[i])
-    #                self.correlations[j].append(r[0])
-    #        # check if this star has high correlation with at least some stars
-    #        high_corr = np.where(np.array(self.correlations[j]) > 0.5)[0]
-    #        if len(high_corr) > 0.10*n_stars_to_correlate:
-    #            self.high_correlation_mask.append(j)
-    #
-    #    # now we know which are highly correlated
-    #    # loop over and make a mask to keep the best ones
-    #    # setting the not-good-ones to zero
-    #    print("Second pass on correlation stars...")
-    #    for j in range(0, n_stars_to_correlate):
-    #        # if the star is in the high correlation pile, continue
-    #        local_correlations = []
-    #        if j in self.high_correlation_mask:
-    #            for i in range(0, n_stars_to_correlate):
-    #                if i in self.high_correlation_mask and i != j:
-    #                    local_correlations.append(pearsonr(self.norm_flux_array[j], self.norm_flux_array[i]))
-    #            self.median_abs_correlations.append(np.median(local_correlations))
-    #        # else give it a score of 0 for correlation
-    #        else:
-    #            self.median_abs_correlations.append(0)
-    #
-    #    # finally set the median correlations list as an array for masking
-    #    self.median_abs_correlations = np.array(self.median_abs_correlations)
 
     def _mask_stars_for_cbvs(self):
         """
@@ -677,7 +635,7 @@ class CBVs():
                 pdf.savefig()
                 plt.close()
 
-    def cotrend_data_map_mp(self, catalog):
+    def cotrend_data_map_mp(self, catalog, camera_id, timeslot):
         """
         Use multiprocessing to speed up the cotrending of many lcs
         """
@@ -688,7 +646,7 @@ class CBVs():
         correction = np.empty((len(target_ids), n_data_points))
 
         # collect together constants for giving to pool
-        const = (catalog, self)
+        const = (catalog, self, camera_id, timeslot)
 
         # the old way of plotting with no thread locking
         # however, we just plot with a different script now for speed
@@ -739,7 +697,7 @@ def worker_fn(star_id, constants):
     start = datetime.utcnow()
 
     # unpack constants
-    catalog, cbvs = constants
+    catalog, cbvs, camera_id, timeslot = constants
 
     try:
         mapp = MAP(catalog, cbvs, star_id)
@@ -755,8 +713,7 @@ def worker_fn(star_id, constants):
     if star_id in cbvs.test_stars or cbvs.debug:
         # debug plotting moved out of the main script
         # pickle the MAP object also for inspection
-        tic_id = int(catalog.ids[star_id])
-        map_filename = f"{cbvs.direc}/TIC-{tic_id}_map.pkl"
+        map_filename = f"{cbvs.direc}/{camera_id}_{timeslot}_{star_id}_map.pkl"
         picklify(map_filename, mapp)
 
     # try to use our super duper new posterior PDF
