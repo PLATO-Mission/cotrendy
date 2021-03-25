@@ -60,6 +60,7 @@ class MAP():
         self.prior_weight = 0.
         self.prior_weight_pt_var = 0.
         self.prior_weight_pt_gen_good = 0.
+        self.prior_snapped_to_cond = defaultdict(bool)
 
         # conditioanl PDF
         self.cond_pdf = defaultdict(np.array)
@@ -329,12 +330,14 @@ class MAP():
                 self.posterior_pdf[cbv_id] = self.cond_pdf[cbv_id]
                 peak_theta = self.cond_peak_theta[cbv_id]
                 peak_pdf = self.cond_peak_pdf[cbv_id]
+                self.prior_snapped_to_cond[cbv_id] = True
             else:
                 posterior = self.cond_pdf[cbv_id] + np.log(self.prior_pdf[cbv_id])*self.prior_weight
                 self.posterior_pdf[cbv_id] = posterior
                 peak_theta, peak_pdf = self._maximise_pdf(cbvs.theta[cbv_id],
                                                           posterior,
                                                           'posterior')
+                self.prior_snapped_to_cond[cbv_id] = False
 
             if peak_theta is None or peak_pdf is None:
                 self.posterior_max_success[cbv_id].append(False)
