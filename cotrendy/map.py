@@ -1,6 +1,7 @@
 """
 MAP components for Cotrendy
 """
+import logging
 from collections import defaultdict
 import numpy as np
 from scipy.stats import gaussian_kde
@@ -74,14 +75,8 @@ class MAP():
 
         # make a mask to exclude the current tus
         # if there is a cbv mask we check this object is not in there
-        if cbvs.cbv_mask is not None:
-            mask = np.where(cbvs.cbv_mask != tus_id)[0]
-            self.prior_mask = cbvs.cbv_mask[mask]
-        # otherwise we make a new mask for all star IDs and then exclude this object
-        else:
-            mask_ids = np.arange(len(cbvs.norm_flux_array))
-            mask = np.where(mask_ids != tus_id)[0]
-            self.prior_mask = mask
+        mask = np.where(cbvs.lc_idx_for_cbvs != tus_id)[0]
+        self.prior_mask = cbvs.lc_idx_for_cbvs[mask]
 
         # calculate the PDFs
         self.calculate_prior_pdfs(catalog, cbvs)
@@ -388,7 +383,7 @@ class MAP():
             theta_peak = -coeffs[1] / (2*coeffs[0])
             pdf_peak = np.polyval(coeffs, theta_peak)
         else:
-            print(f"[{self.tus_id}:{pdf_type}] PDF peak location unbound!")
+            logging.warning(f"[{self.tus_id}:{pdf_type}] PDF peak location unbound!")
             theta_peak = None
             pdf_peak = None
         return theta_peak, pdf_peak
@@ -421,4 +416,3 @@ class MAP():
         # I removed the bandwidth variable as it works it out itself - jmcc
         kde = gaussian_kde(x, weights=weights)
         return kde.evaluate(x_grid)
-

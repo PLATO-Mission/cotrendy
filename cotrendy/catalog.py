@@ -2,6 +2,7 @@
 Catalog components for Cotrendy
 """
 import sys
+import logging
 import traceback
 import numpy as np
 import cotrendy.utils as cuts
@@ -52,7 +53,7 @@ class Catalog():
             # is wrong when pixels, so we distinuish them
             coords_units = cfg['catalog']['coords_units']
         except Exception:
-            print("Missing catalog info from configuration file")
+            logging.error("Missing catalog info from configuration file")
             traceback.print_exc(file=sys.stdout)
             sys.exit(1)
 

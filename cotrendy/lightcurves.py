@@ -2,6 +2,7 @@
 Light curves components for Cotrendy
 """
 import sys
+import logging
 import numpy as np
 from scipy.stats import median_absolute_deviation
 import cotrendy.utils as cuts
@@ -35,19 +36,20 @@ def load_photometry(config, apply_object_mask=True):
 
     times = cuts.depicklify(f"{root}/{time_file}")
     if times is None:
-        print(f"Could not load {root}/{time_file}...")
+        logging.critical(f"Could not load {root}/{time_file}...")
         sys.exit(1)
     fluxes = cuts.depicklify(f"{root}/{flux_file}")
     if fluxes is None:
-        print(f"Could not load {root}/{flux_file}...")
+        logging.critical(f"Could not load {root}/{flux_file}...")
         sys.exit(1)
     errors = cuts.depicklify(f"{root}/{error_file}")
     if errors is None:
-        print(f"Could not load {root}/{error_file}...")
+        logging.critical(f"Could not load {root}/{error_file}...")
         sys.exit(1)
 
     if fluxes.shape != errors.shape or len(times) != len(fluxes[0]):
-        print("Data arrays have mismatched shapes...")
+        logging.critical("Data arrays have mismatched shapes...")
+        sys.exit(1)
 
     # now apply the mask if needed
     if apply_object_mask:
@@ -61,7 +63,7 @@ def load_photometry(config, apply_object_mask=True):
     n_stars = len(fluxes)
     i = 0
     for star, star_err in zip(fluxes, errors):
-        print(f"{i+1}/{n_stars}")
+        logging.info(f"{i+1}/{n_stars}")
         lightcurves.append(Lightcurve(star, star_err, config['data']['reject_outliers']))
         i += 1
 

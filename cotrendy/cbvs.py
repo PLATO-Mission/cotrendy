@@ -1,29 +1,38 @@
 """
 Cotrending Basis Vectors compoents for Cotrendy
 """
+# standard imports
 import gc
 import sys
 import traceback
+import logging
 from datetime import datetime
 from functools import partial
 from multiprocessing import Pool
 from collections import defaultdict
 import numpy as np
-#from scipy.stats import pearsonr
 from scipy.linalg import svd
 import scipy.optimize as optimization
 from scipy.stats import median_absolute_deviation
+# imports for entropy from TASOC
+import bottleneck as bn
+from scipy.special import xlogy
+from statsmodels.nonparametric.kde import KDEUnivariate as KDE
+from sklearn.decomposition import PCA
+# import for plotting
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+# my own imports
 import jastro.lightcurves as jlc
 from cotrendy.map import MAP
 from cotrendy.utils import picklify, depicklify
-#import cotrendy.globalconf as gcnf
 
 # pylint: disable=invalid-name
+# pylint: disable=line-too-long
 
+# TODO update docstring when changes to method are done
 class CBVs():
     """
     A class to generate a series of cotrending basis vectors from
@@ -89,7 +98,7 @@ class CBVs():
         """
         self.camera_id = config['global']['camera_id']
         self.direc = config['global']['root']
-        self.phot_file = config['data']['flux_file'].split('.')[0]
+        self.phot_file = config['data']['flux_file'].split('.pkl')[0]
         self.timesteps = timesteps
         self.targets = targets
         self.lc_idx = np.arange(0, len(targets))
@@ -107,6 +116,14 @@ class CBVs():
         self.normalised_variability_limit = config['cotrend']['normalised_variability_limit']
         self.prior_normalised_variability_limit = config['cotrend']['prior_normalised_variability_limit']
 
+        # the max number to look for
+        self.max_n_cbvs = config['cotrend']['max_n_cbvs']
+        # the actual number extracted
+        self.n_cbvs = 0
+
+        # limiting SNR for useful CBVs
+        self.cbvs_snr_limit = config['cotrend']['cbv_snr_limit'] # dB
+
         # check if we want to load externally calculated variability
         # or do it on the fly. If it's empty we work it out, otherwise
         # we just use the array from the pickle file
@@ -115,37 +132,52 @@ class CBVs():
         else:
             self.variability = None
 
-        # placeholder for CBV domination checks
-        # starts with ones, if a star dominates it
-        # gets set to zero later and CBVs redone
-        self.cbv_domination = np.ones(len(targets))
+        # get the correlation threshold. the top fraction of stars for the CBVs
+        self.correlation_threshold = config['cotrend']['correlation_threshold']
 
-        # some mask placeholders
-        self.variability_mask = np.ones(len(targets))
-        self.pre_cbv_mask = None
-        self.cbv_mask = None
+        # get the threshold for entropy cleaning
+        self.entropy_threshold = config['cotrend']['entropy_threshold']
+        # get the limit on number of stars being rejected by entropy cleaning
+        n_entropy_rejections = config['cotrend']['n_entropy_rejections']
+        # if there is no limit on number of rejections, set it to 1 > size of lc_idx array
+        if n_entropy_rejections < 0:
+            self.n_entropy_rejections = len(self.lc_idx) + 1
+        else:
+            self.n_entropy_rejections = config['cotrend']['n_entropy_rejections']
+
+        # placeholders for variable star ids
+        self.non_variable_star_idx = []
+        self.variable_star_idx = []
+
+        # are we working in pixels or degrees for RA/Dec?
+        # important for the fit coeff correlations plots
+        self.coords_units = config['catalog']['coords_units']
 
         # params for generating CBVs
-        self.correlations = defaultdict(list)
         self.median_abs_correlations = []
-        #self.high_correlation_mask = []
-        self.norm_flux_dithered_array = None
+        self.highly_correlated_star_idx = []
+        self.lowly_correlated_star_idx = []
 
-        # SVD params
+        # placeholder for the dithered array used in SVD
+        self.norm_flux_array_for_cbvs_dithered = None
+
+        # initial CBV / SVD parameters, pre entropy cleaning
+        self.U0, self.s0, self.VT0 = None, None, None
+        self.cbvs0 = defaultdict(list)
+        # storage for the CBV SNRs
+        self.cbvs0_snr = {}
+
+        # final CBV / SVD params, post entropy cleaning
         self.U, self.s, self.VT = None, None, None
-
-        # hold the CBVs
         self.cbvs = defaultdict(list)
-        # this is a numpy array that's easier to broadcast on
-        self.vect_store = None
-        # the max number to look for
-        self.max_n_cbvs = config['cotrend']['max_n_cbvs']
-        # the actual number extracted
-        self.n_cbvs = 0
-
         # storage for the CBV SNRs
         self.cbvs_snr = {}
-        self.cbvs_snr_limit = config['cotrend']['cbv_snr_limit'] # dB
+
+        # keep track of rejected stars
+        self.entropy_rejected_idx = []
+
+        # this is a numpy array that's easier to broadcast on
+        self.vect_store = None
 
         # CBV fit coefficients
         self.fit_coeffs = defaultdict(list)
@@ -173,6 +205,11 @@ class CBVs():
         self.norm_flux_array = np.array(norm_flux_array)
         self.norm_fluxerr_array = np.array(norm_fluxerr_array)
 
+        # initialise some storage for the CBVs stars
+        # these arrays will be whittled down during CBV star selection
+        self.norm_flux_array_for_cbvs = np.copy(self.norm_flux_array)
+        self.lc_idx_for_cbvs = np.copy(self.lc_idx)
+
     def calculate_normalised_variability(self):
         """
         First apply a filter to remove variable stars
@@ -185,14 +222,15 @@ class CBVs():
         Loop over all the stars, subtract a 3rd order polynomial
         Work out the RMS
         """
-        print("Finding variable stars...")
+        logging.info("Finding variable stars...")
 
         if self.variability is None:
-            print("Calculating normalised variability...")
+            logging.info("Calculating normalised variability...")
             sigma_y, delta_y = [], []
             for target in self.targets:
                 delta_y.append(np.average(target.fluxerr_wtrend))
-                coeffs = np.polyfit(self.timesteps, target.flux_wtrend, 3)
+                # TODO REMOVE 1st ORDER FIT!!!!!!
+                coeffs = np.polyfit(self.timesteps, target.flux_wtrend, 1)
                 besty = np.polyval(coeffs, self.timesteps)
                 # this was original flux_wtrend - besty, which seemed wrong
                 # as all the stars for CBVs were chosen as the fainest ones.
@@ -205,9 +243,6 @@ class CBVs():
             V = sigma_y / delta_y
             median_V = np.median(V)
             self.variability = V / median_V
-
-        var_loc = np.where(self.variability > self.normalised_variability_limit)[0]
-        self.variability_mask[var_loc] = 0.0
 
         try:
             # set log V for plotting
@@ -224,7 +259,7 @@ class CBVs():
             plt.close()
             gc.collect()
         except ValueError:
-            print('Catching odd error with making variability histogram. Skipping...')
+            logging.error('Catching odd error with making variability histogram. Skipping...')
 
     def calculate_pearson_correlation(self):
         """
@@ -239,36 +274,16 @@ class CBVs():
         and then multiplying the array by its transpose and dividing by the
         number of observations, we get a correlation maxtrix equivilant to the pearson
         correlation.
+
+        Note: As of cotrendy version 0.1.0.dev this function calculates correlations
+        for the stars that make the variability cut only.
         """
-        n_cadences = len(self.norm_flux_array[0])
-        n_targets = len(self.norm_flux_array)
-        per_object_rms = np.std(self.norm_flux_array, axis=1).reshape(n_targets, -1)
-        unit_norm_flux = self.norm_flux_array / per_object_rms
+        n_cadences = len(self.norm_flux_array_for_cbvs[0])
+        n_targets = len(self.norm_flux_array_for_cbvs)
+        per_object_rms = np.std(self.norm_flux_array_for_cbvs, axis=1).reshape(n_targets, -1)
+        unit_norm_flux = self.norm_flux_array_for_cbvs / per_object_rms
         correlation_matrix = (unit_norm_flux @ unit_norm_flux.T) / n_cadences
         self.median_abs_correlations = np.median(np.abs(correlation_matrix), axis=0)
-
-    def _mask_stars_for_cbvs(self):
-        """
-        Take the variability mask and combine it
-        with the pearson correlations to find
-        the best CBV stars
-
-        Use the binary variability mask and multiply
-        by the correlation values. Those that are variable
-        go to 0.
-        """
-        print("Masking poor CBV stars...")
-        self.pre_cbv_mask = self.median_abs_correlations * self.variability_mask * self.cbv_domination
-        # sort the lcs by combined mask score
-        temp = zip(self.pre_cbv_mask, self.lc_idx)
-        temp = sorted(temp, reverse=True)
-        # TODO: Make a plot here to show the stars scores
-        # maybe the top 50% is not correct?
-        pre_cbv_mask_sorted, lc_idx_sorted = map(np.array, zip(*temp))
-        # find the targets with non-zero scores
-        n = np.where(pre_cbv_mask_sorted != 0)[0]
-        # keep the top 50% most correlated light curves, non-zero light curves
-        self.cbv_mask = lc_idx_sorted[:len(n)//2]
 
     def _apply_zero_mean_dither(self):
         """
@@ -277,38 +292,55 @@ class CBVs():
         CBVs. This is only done when making the CBVs, not
         when analysing the actual light curves
         """
-        print("Applying zero mean dither...")
-        n_light_curves = len(self.norm_flux_array)
+        logging.info("Applying zero mean dither...")
+        n_light_curves = len(self.norm_flux_array_for_cbvs)
         dither = np.random.normal(loc=0.0, scale=0.001, size=n_light_curves)
-        self.norm_flux_dithered_array = self.norm_flux_array + dither.reshape(n_light_curves, 1)
+        self.norm_flux_array_for_cbvs_dithered = self.norm_flux_array_for_cbvs + dither.reshape(n_light_curves, 1)
 
-    def calculate_svd(self, cbv_pass):
+    def calculate_svd(self, initial=False):
         """
         Take the previously filtered flux array and calculate the SVD
 
         We apply a zero mean dither before hand
+
+        initial flag allows us to store results in 0 arrays.
+        This allows a pre and post entropy cleaning check on the CBVs
         """
-        print("Calculating the SVD...")
         # now we take the SVD of the highest correlated light curves
         # NOTE fluxes need to be in columns in order for the left-singular maxtrix (U)
         # to return us the CBVs in order
-        # NOTE we only need to work out variability, correlation and zero dither once
-        if cbv_pass == 0:
-            self.calculate_normalised_variability()
-            self.calculate_pearson_correlation()
-            self._apply_zero_mean_dither()
-        self._mask_stars_for_cbvs()
-        print("Calculating SVD...")
-        self.U, self.s, self.VT = svd(self.norm_flux_dithered_array[self.cbv_mask].T)
-        print(f"Matrix shapes -  U: {self.U.shape}, s: {self.s.shape}, VT: {self.VT.shape}")
+        if initial:
+            logging.info("Calculating the initial SVD...")
+            self.U0, self.s0, self.VT0 = svd(self.norm_flux_array_for_cbvs_dithered.T)
+            output_filename = f"{self.direc}/singular_values_{self.camera_id}_{self.phot_file}_initial.png"
+            sing_vals = self.s0
+            logging.info(f"Matrix shapes -  U: {self.U0.shape}, s: {self.s0.shape}, VT: {self.VT0.shape}")
+        else:
+            logging.info("Calculating the final SVD...")
+            self.U, self.s, self.VT = svd(self.norm_flux_array_for_cbvs_dithered.T)
+            output_filename = f"{self.direc}/singular_values_{self.camera_id}_{self.phot_file}.png"
+            sing_vals = self.s
+            logging.info(f"Matrix shapes -  U: {self.U.shape}, s: {self.s.shape}, VT: {self.VT.shape}")
 
-        # plot the first 50 singular values against their index
-        output_filename = f"{self.direc}/singular_values_{self.camera_id}_{self.phot_file}.png"
+        # plot the first ~50 singular values against their index
         fig, ax = plt.subplots(1, figsize=(5, 5))
-        inds = np.arange(1, 51)
-        ax.loglog(inds, self.s[:50], 'ko')
-        ax.loglog(inds, self.s[:50], 'k-')
-        ax.set_xlabel('Singular value index')
+
+        # quickly check can we plot 50 singlular values? If <50, plot them all
+        if initial:
+            n_vecs = self.U0.shape[0]
+        else:
+            n_vecs = self.U.shape[0]
+
+        # check can we do 50 or not?
+        if n_vecs >= 50:
+            n_plot = 50
+        else:
+            n_plot = n_vecs
+
+        inds = np.arange(1, n_plot+1)
+        ax.loglog(inds, sing_vals[:n_plot], 'ko')
+        ax.loglog(inds, sing_vals[:n_plot], 'k-')
+        ax.set_xlabel('Singular value index [1 ind]')
         ax.set_ylabel('Singular vale')
         fig.tight_layout()
         fig.savefig(output_filename)
@@ -316,7 +348,7 @@ class CBVs():
         plt.close()
         gc.collect()
 
-    def calculate_cbv_snr(self):
+    def calculate_cbv_snr(self, initial=False):
         """
         Kepler implements as check on the SNR for each
         CBV. If the SNR (dB) is < 5dB, they are removed.
@@ -324,45 +356,207 @@ class CBVs():
         They typically use 8 and only some CBVs across
         the entire FOV were ever removed
         """
-        to_delete = []
-        print(f"Calculating {self.max_n_cbvs} CBV SNRs...")
-        for i in sorted(self.cbvs):
-            Anoise = np.std(np.diff(self.cbvs[i]))
-            Asignal = np.std(self.cbvs[i])
+        logging.info(f"Calculating {self.max_n_cbvs} CBV SNRs...")
+
+        if initial:
+            cbvs = self.cbvs0
+        else:
+            cbvs = self.cbvs
+
+        for i in sorted(cbvs):
+            Anoise = np.std(np.diff(cbvs[i]))
+            Asignal = np.std(cbvs[i])
             snr = 10*np.log10((Asignal**2) / (Anoise**2))
-            self.cbvs_snr[i] = snr
-            print(f"CBV {i} SNR: {snr:.3f} dB")
-            if snr < self.cbvs_snr_limit:
-                print("Low SNR CBV, deleting!")
-                to_delete.append(i)
-        # do the deleting after the loop, otherwise, splosions
-        for i in to_delete:
-            del self.cbvs[i]
-        # store the final number of CBVs
-        self.n_cbvs = len(self.cbvs)
+            if initial:
+                self.cbvs0_snr[i] = snr
+            else:
+                self.cbvs_snr[i] = snr
+            logging.info(f"CBV {i} SNR: {snr:.3f} dB")
+
+    @staticmethod
+    def _compute_entropy(U):
+        """
+        Taken from TASOC code
+
+        Add docstring
+        """
+        HGauss0 = 0.5 + 0.5*np.log(2*np.pi)
+        nSingVals = U.shape[1]
+        H = np.empty(nSingVals, dtype='float64')
+
+        for iBasisVector in range(nSingVals):
+            kde = KDE(np.abs(U[:, iBasisVector]))
+            kde.fit(gridsize=1000)
+
+            pdf = kde.density
+            x = kde.support
+
+            dx = x[1]-x[0]
+
+            # Calculate the Gaussian entropy
+            pdfMean = bn.nansum(x * pdf)*dx
+            with np.errstate(invalid='ignore'):
+                sigma = np.sqrt(bn.nansum(((x-pdfMean)**2) * pdf) * dx)
+            HGauss = HGauss0 + np.log(sigma)
+
+            # Calculate vMatrix entropy
+            pdf_pos = (pdf > 0)
+            HVMatrix = -np.sum(xlogy(pdf[pdf_pos], pdf[pdf_pos])) * dx
+
+            # Returned entropy is difference between V-Matrix entropy and Gaussian entropy of similar width (sigma)
+            H[iBasisVector] = HVMatrix - HGauss
+
+        return H
+
+    def entropy_cleaning(self, ncomponents, random_state=999):
+        """
+        Entropy-cleaning of lightcurve matrix using the SVD U-matrix.
+
+        TODO: fix docstring
+        """
+        # conversion constant from MAD to Sigma. Constant is 1/norm.ppf(3/4)
+        mad_to_sigma = 1.482602218505602
+        # added to track those rejected - jmcc
+        rejected_idx = []
+
+        # Calculate the principle components:
+        pca = PCA(ncomponents, random_state=random_state)
+        U, _, _ = pca._fit(self.norm_flux_array_for_cbvs_dithered)
+
+        ent = self._compute_entropy(U)
+        logging.info(f"Entropy start: {ent}")
+
+        targets_removed = 0
+        components = np.arange(ncomponents)
+
+        with np.errstate(invalid='ignore'):
+            while np.any(ent < self.entropy_threshold):
+                com = components[ent < self.entropy_threshold][0]
+
+                # Remove highest relative weight target
+                m = bn.nanmedian(U[:, com])
+                s = mad_to_sigma*bn.nanmedian(np.abs(U[:, com] - m))
+                dev = np.abs(U[:, com] - m) / s
+
+                idx0 = np.argmax(dev)
+                logging.info(f"{len(dev)}, {idx0}, {len(self.lc_idx_for_cbvs)}")
+
+                # store the id from the original matrix, so we can see which were rejected
+                rejected_idx.append(self.lc_idx_for_cbvs[idx0])
+                # then remove that element from the list of original IDs so the list length
+                # follows that of the matrix.
+                self.lc_idx_for_cbvs = np.delete(self.lc_idx_for_cbvs, idx0)
+
+                # Remove the star from the lightcurve matrix:
+                star_no = np.ones(U.shape[0], dtype=bool)
+                star_no[idx0] = False
+                # remove the star from both the dithered and undithered arrays
+                self.norm_flux_array_for_cbvs = self.norm_flux_array_for_cbvs[star_no, :]
+                self.norm_flux_array_for_cbvs_dithered = self.norm_flux_array_for_cbvs_dithered[star_no, :]
+
+                targets_removed += 1
+                if targets_removed >= self.n_entropy_rejections:
+                    logging.warning(f"Entropy cleaning rejection limit {self.n_entropy_rejections} reached, breaking")
+                    break
+                elif len(self.norm_flux_array_for_cbvs_dithered) == 0:
+                    logging.critical(f"Entropy cleaning has removed all stars, quitting!")
+                    sys.exit(1)
+
+                U, _, _ = pca._fit(self.norm_flux_array_for_cbvs_dithered)
+                ent = self._compute_entropy(U)
+
+        logging.info(f"Entropy end: {ent}")
+        logging.info(f"Targets removed: {targets_removed}")
+        self.entropy_rejected_idx = rejected_idx
 
     def calculate_cbvs(self):
         """
         Generate the CBVs from the SVD output
         """
-        print("Calculating CBVs...")
-        # fudge domination level to massive number to force looping
-        n_dominating = 1E6
-        # keep track of the number of passes on CBV generation
-        cbv_pass = 0
-        # loop until there are no more dominating stars
-        while n_dominating != 0:
-            print(f"Starting CBV pass {cbv_pass}...")
-            self.calculate_svd(cbv_pass)
-            for i in range(self.max_n_cbvs):
-                self.cbvs[i] = self.U[:, i]
+        logging.info("Calculating CBVs...")
 
-            # check they have sufficient SNR
-            self.calculate_cbv_snr()
-            n_dominating = self._check_for_dominating_stars(cbv_pass)
-            cbv_pass += 1
+        # When we start we have the two _for_cbvs arrays, which are
+        # copies of the original full lc array and their indexes
+        # we want to work on those arrays and whittle them down
 
-        # make a numpy array of the vectors for using later
+        # step 1, calculate the normalised variability
+        self.calculate_normalised_variability()
+        # make a cut of the _for_cbvs flux array, removing anything >= Var lim
+        non_var_loc = np.where(self.variability < self.normalised_variability_limit)[0]
+        self.non_variable_star_idx = non_var_loc
+        # for completeness, lets keep the ids of the variable objects too
+        var_loc = np.where(self.variability >= self.normalised_variability_limit)[0]
+        self.variable_star_idx = var_loc
+
+        self.norm_flux_array_for_cbvs = self.norm_flux_array_for_cbvs[non_var_loc]
+        self.lc_idx_for_cbvs = self.lc_idx_for_cbvs[non_var_loc]
+
+        # the surviving, non-variable stars then go into the correlation stage
+        self.calculate_pearson_correlation()
+        # now sort the objects by their correlations and keep the top 50%
+        temp = zip(self.median_abs_correlations, self.lc_idx_for_cbvs)
+        temp = sorted(temp, reverse=True)
+
+        median_abs_correlations_sorted, lc_idx_for_cbvs_sorted = map(np.array, zip(*temp))
+        # find the position that corresponds to the limiting correlation
+        loc_correlation_limit = int(len(median_abs_correlations_sorted)*self.correlation_threshold)
+        correlation_limit = median_abs_correlations_sorted[loc_correlation_limit]
+        # store the ids of the highly correlated stars
+        self.highly_correlated_star_idx = lc_idx_for_cbvs_sorted[:loc_correlation_limit]
+        # keep the ids of the lowly correlated stars for completeness
+        self.lowly_correlated_star_idx = lc_idx_for_cbvs_sorted[loc_correlation_limit:]
+        # keep all the stars with correlations > the correlation limit
+        cor_loc = np.where(self.median_abs_correlations >= correlation_limit)[0]
+        # next whittle the _for_cbvs arrays down to only those highly correlated stars
+        self.norm_flux_array_for_cbvs = self.norm_flux_array_for_cbvs[cor_loc]
+        self.lc_idx_for_cbvs = self.lc_idx_for_cbvs[cor_loc]
+
+        # we need to apply a small dither to the CBV lcs to avoid a node
+        # where the normalised flux crosses zero
+        self._apply_zero_mean_dither()
+
+        # now calculate the initial svd, pre entropy cleaning
+        self.calculate_svd(initial=True)
+        for i in range(self.max_n_cbvs):
+            self.cbvs0[i] = self.U0[:, i]
+
+        # check the initial CBVs SNRs
+        self.calculate_cbv_snr(initial=True)
+
+        # It seems to make sense that we only do an entropy check for the
+        # highest SNR CBVs, so let's add an initial check here to determine how
+        # many components to entropy check
+        n_components_to_entropy_check = self.max_n_cbvs
+        #for i in sorted(self.cbvs0):
+        #    if i == 0 or self.cbvs0_snr[i] >= self.cbvs_snr_limit:
+        #        n_components_to_entropy_check += 1
+
+        # do the entropy cleaning
+        self.entropy_cleaning(n_components_to_entropy_check)
+
+        # now calculate the final svd, post entropy cleaning
+        self.calculate_svd(initial=False)
+        for i in range(self.max_n_cbvs):
+            self.cbvs[i] = self.U[:, i]
+
+        # check the initial CBVs SNRs
+        self.calculate_cbv_snr(initial=False)
+
+        # check the final CBV SNRs and remove (or not) any
+        to_delete = []
+        for i in sorted(self.cbvs):
+            if i != 0 and self.cbvs_snr[i] < self.cbvs_snr_limit:
+                logging.info(f"Low SNR CBV {i}, deleting!")
+                to_delete.append(i)
+
+        # do the actual deletion
+        for i in to_delete:
+            del self.cbvs[i]
+
+        # get the final number of high SNR CBVs
+        self.n_cbvs = len(self.cbvs)
+
+        # make a convenient numpy array of the vectors for using later
         # grab the vectors from their dictionary
         vect_store = []
         for c in sorted(self.cbvs):
@@ -370,62 +564,25 @@ class CBVs():
         # make them into a numpy array
         self.vect_store = np.array(vect_store)
 
+        # TODO: calculate the CBV effectiveness scores as per TASOC
         # plot the CBVs for everyone to see
         output_filename = f"{self.direc}/cbvs_{self.camera_id}_{self.phot_file}.png"
-        fig, ax = plt.subplots(self.n_cbvs+1, figsize=(10, 10))
-        for i, cbv_id in enumerate(sorted(self.cbvs.keys())):
-            ax[i].plot(self.cbvs[cbv_id], label=f'CBV {cbv_id}')
-            ax[i].legend()
+        fig, ax = plt.subplots(self.max_n_cbvs, figsize=(10, 10), sharex=True, sharey=True)
+
+        # plot the initial CBVs, pre entropy cleaning
+        for cbv_id in sorted(self.cbvs0.keys()):
+            ax[cbv_id].plot(self.cbvs0[cbv_id], label=f'CBV0 {cbv_id}', color='orange')
+            ax[cbv_id].legend(loc='upper right', fontsize='small')
+        # plot the final CBVs post entropy cleaning
+        for cbv_id in sorted(self.cbvs.keys()):
+            ax[cbv_id].plot(self.cbvs[cbv_id], label=f'CBV {cbv_id}', color='blue')
+            ax[cbv_id].legend(loc='upper right', fontsize='small')
         fig.tight_layout()
+        fig.subplots_adjust(hspace=0.0)
         fig.savefig(output_filename)
         fig.clf()
         plt.close()
         gc.collect()
-
-    def _check_for_dominating_stars(self, cbv_pass):
-        """
-        Kepler implements a check for stars
-        that dominate in the creation of CBVs
-
-        Run stats on the right singular vectors for
-        each CBV. Any stars that contribute overly
-        to the CBV should be removed and the CBVs
-        redone
-        """
-        print("Checking for dominating stars...")
-        with PdfPages(f"{self.direc}/dominating_stars_camera_{self.camera_id}_{self.phot_file}_pass_{cbv_pass}.pdf") as pdf:
-            # loop over each CVB and check individual star's contributions
-            # dominating stars will stick out from the rest
-            for i, v in enumerate(self.VT[:len(self.cbvs)]):
-                print(f"Checking for dominating stars in CBV {i}")
-                mean = np.mean(self.VT[i])
-                std = np.std(self.VT[i])
-                n = np.where(((v > mean+3*std) | (v < mean-3*std)))[0]
-                n_dominating = len(n)
-
-                # make a plot
-                fig, ax = plt.subplots(1)
-                ax.plot(v, 'k-')
-                ax.axhline(mean+3*std, lw=1, color='red')
-                ax.axhline(mean-3*std, lw=1, color='red')
-
-                # flag the bad objects
-                for j in n:
-                    # j is their CBV star index
-                    # we need to keep their object index so we can mask them out
-                    bad_indx = self.cbv_mask[j]
-                    print(f"Removing star {bad_indx} from CBV list")
-                    self.cbv_domination[self.cbv_mask[j]] = 0
-                    # mark them on the plot also
-                    ax.axvline(j, lw=1, color='orange')
-
-                # complete the plotting
-                ax.set_xlabel('CBV Star ID')
-                ax.set_ylabel(f'Contribution to CVB {i}')
-                fig.tight_layout()
-                pdf.savefig()
-                plt.close()
-        return n_dominating
 
     @staticmethod
     def _fit_cbvs_to_data(x, y, vectors):
@@ -462,7 +619,7 @@ class CBVs():
         Calculate the fit coefficients, but instead of one by
         one in turn of their position in U, do them simultaneously
         """
-        print("Calculating CBVs fit coeffs...")
+        logging.info("Calculating CBVs fit coeffs...")
 
         # initial guess at fit coeffs
         x0 = [-0.1]*len(self.vect_store)
@@ -505,7 +662,7 @@ class CBVs():
         If >1 CBV is found, the previous CBVs must be fitted and
         removed from the data before fitting the next one.
         """
-        print("Calculating CBVs fit coeffs...")
+        logging.info("Calculating CBVs fit coeffs...")
 
         # initial guess at fit coeff
         x0 = [-0.1]
@@ -544,7 +701,14 @@ class CBVs():
         the coeffs against ra, dec, mag etc to look for correlations
         for each basis vector
         """
-        print("Plotting fit coefficients correlations...")
+        logging.info("Plotting fit coefficients correlations...")
+
+        # determine binning scales for plots
+        if self.coords_units == 'pix':
+            coords_scale = 200 # pixels
+        else:
+            coords_scale = 0.5 # degrees
+
         with PdfPages(f"{self.direc}/fit_coeff_correlations_{self.camera_id}_{self.phot_file}.pdf") as pdf:
             # loop over ra, dec and mag for each CBV and plot the
             # coeffs for all stars but also for the CBV only stars
@@ -564,33 +728,35 @@ class CBVs():
                 # RA running averages
                 ra_cor = np.vstack((catalog.ra, self.fit_coeffs[cbv_id]))
                 ra_cor_s = ra_cor[:, ra_cor[0].argsort()]
-                ra_cor_m = np.vstack((catalog.ra[self.cbv_mask], self.fit_coeffs[cbv_id][self.cbv_mask]))
+                ra_cor_m = np.vstack((catalog.ra[self.lc_idx_for_cbvs], self.fit_coeffs[cbv_id][self.lc_idx_for_cbvs]))
                 ra_cor_m_s = ra_cor_m[:, ra_cor_m[0].argsort()]
 
                 ra_sorted_bin, ra_coeff_sorted_bin, _ = jlc.pc_bin(ra_cor_s[0], ra_cor_s[1],
-                                                                   ra_cor_s[1], 0.5, mode="median")
+                                                                   ra_cor_s[1], coords_scale,
+                                                                   mode="median")
                 ra_mask_sorted_bin, ra_coeff_mask_sorted_bin, _ = jlc.pc_bin(ra_cor_m_s[0],
                                                                              ra_cor_m_s[1],
                                                                              ra_cor_m_s[1],
-                                                                             0.5)
+                                                                             coords_scale)
 
                 # DEC running averages
                 dec_cor = np.vstack((catalog.dec, self.fit_coeffs[cbv_id]))
                 dec_cor_s = dec_cor[:, dec_cor[0].argsort()]
-                dec_cor_m = np.vstack((catalog.dec[self.cbv_mask], self.fit_coeffs[cbv_id][self.cbv_mask]))
+                dec_cor_m = np.vstack((catalog.dec[self.lc_idx_for_cbvs], self.fit_coeffs[cbv_id][self.lc_idx_for_cbvs]))
                 dec_cor_m_s = dec_cor_m[:, dec_cor_m[0].argsort()]
 
                 dec_sorted_bin, dec_coeff_sorted_bin, _ = jlc.pc_bin(dec_cor_s[0], dec_cor_s[1],
-                                                                     dec_cor_s[1], 0.5, mode="median")
+                                                                     dec_cor_s[1], coords_scale,
+                                                                     mode="median")
                 dec_mask_sorted_bin, dec_coeff_mask_sorted_bin, _ = jlc.pc_bin(dec_cor_m_s[0],
                                                                                dec_cor_m_s[1],
                                                                                dec_cor_m_s[1],
-                                                                               0.5)
+                                                                               coords_scale)
 
                 # Mag running averages
                 mag_cor = np.vstack((catalog.mag, self.fit_coeffs[cbv_id]))
                 mag_cor_s = mag_cor[:, mag_cor[0].argsort()]
-                mag_cor_m = np.vstack((catalog.mag[self.cbv_mask], self.fit_coeffs[cbv_id][self.cbv_mask]))
+                mag_cor_m = np.vstack((catalog.mag[self.lc_idx_for_cbvs], self.fit_coeffs[cbv_id][self.lc_idx_for_cbvs]))
                 mag_cor_m_s = mag_cor_m[:, mag_cor_m[0].argsort()]
 
                 mag_sorted_bin, mag_coeff_sorted_bin, _ = jlc.pc_bin(mag_cor_s[0], mag_cor_s[1],
@@ -598,40 +764,41 @@ class CBVs():
                 mag_mask_sorted_bin, mag_coeff_mask_sorted_bin, _ = jlc.pc_bin(mag_cor_m_s[0],
                                                                                mag_cor_m_s[1],
                                                                                mag_cor_m_s[1],
-                                                                               0.25)
+                                                                               0.5)
 
                 # plot against ra
                 ax[0].plot(self.fit_coeffs[cbv_id], catalog.ra, '.', color='grey', label='All')
-                ax[0].plot(self.fit_coeffs[cbv_id][self.cbv_mask], catalog.ra[self.cbv_mask],
+                ax[0].plot(self.fit_coeffs[cbv_id][self.lc_idx_for_cbvs], catalog.ra[self.lc_idx_for_cbvs],
                            'k.', label='SVD')
                 ax[0].plot(ra_coeff_sorted_bin, ra_sorted_bin, 'b-', label="All")
                 ax[0].plot(ra_coeff_mask_sorted_bin, ra_mask_sorted_bin, 'r-', label="SVD")
                 ax[0].set_ylabel("R.A.")
                 ax[0].set_xlim(llim, ulim)
-                ax[0].legend()
+                ax[0].legend(fontsize='small', loc='upper right')
 
                 # plot against dec
                 ax[1].plot(self.fit_coeffs[cbv_id], catalog.dec, '.', color='grey', label='All')
-                ax[1].plot(self.fit_coeffs[cbv_id][self.cbv_mask], catalog.dec[self.cbv_mask],
+                ax[1].plot(self.fit_coeffs[cbv_id][self.lc_idx_for_cbvs], catalog.dec[self.lc_idx_for_cbvs],
                            'k.', label='SVD')
                 ax[1].plot(dec_coeff_sorted_bin, dec_sorted_bin, 'b-', label="All")
                 ax[1].plot(dec_coeff_mask_sorted_bin, dec_mask_sorted_bin, 'r-', label="SVD")
                 ax[1].set_ylabel("Dec.")
                 ax[1].set_xlim(llim, ulim)
-                ax[1].legend()
+                ax[1].legend(fontsize='small', loc='upper right')
 
                 # plot against mag
                 ax[2].plot(self.fit_coeffs[cbv_id], catalog.mag, '.', color='grey', label='All')
-                ax[2].plot(self.fit_coeffs[cbv_id][self.cbv_mask], catalog.mag[self.cbv_mask],
+                ax[2].plot(self.fit_coeffs[cbv_id][self.lc_idx_for_cbvs], catalog.mag[self.lc_idx_for_cbvs],
                            'k.', label='SVD')
                 ax[2].plot(mag_coeff_sorted_bin, mag_sorted_bin, 'b-', label="All")
                 ax[2].plot(mag_coeff_mask_sorted_bin, mag_mask_sorted_bin, 'r-', label="SVD")
                 ax[2].set_ylabel("Mag")
                 ax[2].set_xlabel(f"Coeff value, CBV {cbv_id}")
                 ax[2].set_xlim(llim, ulim)
-                ax[2].legend()
+                ax[2].legend(fontsize='small', loc='upper right')
 
                 fig.tight_layout()
+                fig.subplots_adjust(hspace=0.0)
                 pdf.savefig()
                 plt.close()
 
@@ -673,7 +840,7 @@ class CBVs():
         cotrending_flux_array = []
 
         for target_id in np.arange(0, len(self.norm_flux_array)):
-            print(f"Cotrending {target_id}/{len(self.norm_flux_array)}...")
+            logging.info(f"Cotrending {target_id}/{len(self.norm_flux_array)}...")
             correction_to_apply = []
             for cbv_id in sorted(self.cbvs):
                 component = self.cbvs[cbv_id]*self.fit_coeffs[cbv_id][target_id]
@@ -705,7 +872,7 @@ def worker_fn(star_id, constants):
         # return the star_id and all zeros for the correction
         # if the mapp processing fails
         traceback.print_exc(file=sys.stdout)
-        print("MAP failed, skipping...")
+        logging.warning("MAP failed, skipping...")
         n_data_points = len(cbvs.norm_flux_array[0])
         return star_id, np.zeros(n_data_points)
 
@@ -734,6 +901,6 @@ def worker_fn(star_id, constants):
     # check the run time for this star
     end = datetime.utcnow()
     diff_time = (end - start).seconds
-    print(f"[{star_id}] Started: {start} - Finished: {end} - Runtime: {diff_time} sec")
+    logging.info(f"[{star_id}] Started: {start} - Finished: {end} - Runtime: {diff_time} sec")
 
     return star_id, correction_to_apply
