@@ -545,7 +545,11 @@ class CBVs():
         # check the final CBV SNRs and remove (or not) any
         to_delete = []
         for i in sorted(self.cbvs):
-            if i != 0 and self.cbvs_snr[i] < self.cbvs_snr_limit:
+            # TODO: cbv_id 0 often comes out with low SNR
+            # Decide on whether to keep it or not. BOL4_subset_frac data has it in
+            # BOL4_subset_frac_ignore_me data will be a test without it.
+            #if i != 0 and self.cbvs_snr[i] < self.cbvs_snr_limit:
+            if self.cbvs_snr[i] < self.cbvs_snr_limit:
                 logging.info(f"Low SNR CBV {i}, deleting!")
                 to_delete.append(i)
 
