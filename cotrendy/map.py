@@ -60,6 +60,7 @@ class MAP():
         self.prior_weight = 0.
         self.prior_weight_pt_var = 0.
         self.prior_weight_pt_gen_good = 0.
+        self.prior_cond_snapping = cbvs.prior_cond_snapping
         self.prior_snapped_to_cond = defaultdict(bool)
 
         # conditioanl PDF
@@ -326,7 +327,8 @@ class MAP():
             # if so, skip the posterior and snap to the conditional only
             sigma_snap_llim = self.prior_peak_theta[cbv_id] - self.prior_sigma[cbv_id]
             sigma_snap_ulim = self.prior_peak_theta[cbv_id] + self.prior_sigma[cbv_id]
-            if sigma_snap_llim <= self.cond_peak_theta[cbv_id] <= sigma_snap_ulim:
+
+            if sigma_snap_llim <= self.cond_peak_theta[cbv_id] <= sigma_snap_ulim and self.prior_cond_snapping:
                 self.posterior_pdf[cbv_id] = self.cond_pdf[cbv_id]
                 peak_theta = self.cond_peak_theta[cbv_id]
                 peak_pdf = self.cond_peak_pdf[cbv_id]

@@ -210,6 +210,12 @@ class CBVs():
         self.norm_flux_array_for_cbvs = np.copy(self.norm_flux_array)
         self.lc_idx_for_cbvs = np.copy(self.lc_idx)
 
+        # here were take in some parameters which are passed to MAP if needed
+        try:
+            self.prior_cond_snapping = config['cotrend']['prior_cond_snapping']
+        except KeyError:
+            self.prior_cond_snapping = False
+
     def calculate_normalised_variability(self):
         """
         First apply a filter to remove variable stars
@@ -548,8 +554,8 @@ class CBVs():
             # TODO: cbv_id 0 often comes out with low SNR
             # Decide on whether to keep it or not. BOL4_subset_frac data has it in
             # BOL4_subset_frac_ignore_me data will be a test without it.
-            #if i != 0 and self.cbvs_snr[i] < self.cbvs_snr_limit:
-            if self.cbvs_snr[i] < self.cbvs_snr_limit:
+            #if self.cbvs_snr[i] < self.cbvs_snr_limit:
+            if i != 0 and self.cbvs_snr[i] < self.cbvs_snr_limit:
                 logging.info(f"Low SNR CBV {i}, deleting!")
                 to_delete.append(i)
 
