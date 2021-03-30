@@ -10,6 +10,7 @@ from scipy.stats import median_absolute_deviation as mad
 from scipy.signal import periodogram
 
 # pylint: disable=invalid-name
+# pylint: disable=line-too-long
 
 class MAP():
     """
@@ -20,9 +21,6 @@ class MAP():
 
     PDFs and parameters are indexed by CBV_id
     """
-
-    # TODO: Break all coeffs out into config file
-
     def __init__(self, catalog, cbvs, tus_id):
         """
         Initialise the MAP class
@@ -62,6 +60,13 @@ class MAP():
         self.prior_weight_pt_gen_good = 0.
         self.prior_cond_snapping = cbvs.prior_cond_snapping
         self.prior_snapped_to_cond = defaultdict(bool)
+        # tuneable parameters
+        self.prior_alpha_g = cbvs.prior_alpha_g
+        self.prior_raw_goodness_exponent = cbvs.prior_raw_goodness_exponent
+        self.prior_noise_goodness_weight = cbvs.prior_noise_goodness_weight
+        self.prior_pdf_variability_weight = cbvs.prior_pdf_variability_weight
+        self.prior_pdf_goodness_gain = cbvs.prior_pdf_goodness_gain
+        self.prior_pdf_goodness_weight = cbvs.prior_pdf_goodness_weight
 
         # conditioanl PDF
         self.cond_pdf = defaultdict(np.array)
@@ -221,9 +226,8 @@ class MAP():
 
         # the scaling values come from Kepler
         # a value near 0 is a bad prior goodness, a value near 1 is a good prior goodness
-        # TODO: Pull the scaling factors out to the config file
-        # and also workout out how to choose those values!?
-        prior_general_goodness = 1 - (std_diff_prior_to_poly/5.)**(3)
+        # TODO: how are these parameters in the equation determined?
+        prior_general_goodness = 1 - (std_diff_prior_to_poly/self.prior_alpha_g)**(self.prior_raw_goodness_exponent)
 
         # set it to 0 if it's < 0
         if prior_general_goodness < 0.0:
@@ -233,10 +237,8 @@ class MAP():
         _, psd_flux = periodogram(np.diff(cbvs.norm_flux_array[self.tus_id]), detrend=False)
         _, psd_prior = periodogram(np.diff(prior_fit), detrend=False)
 
-        # TODO: same here, why is the noise 2e-4?
         psd_ratio = psd_prior / psd_flux
-        noise_weight = 2e-4
-        prior_noise_goodness = noise_weight * np.sum(np.log(psd_ratio[psd_ratio > 1]**2))
+        prior_noise_goodness = self.prior_noise_goodness_weight * np.sum(np.log(psd_ratio[psd_ratio > 1]**2))
         prior_noise_goodness = 1. / (prior_noise_goodness + 1)
 
         return prior_general_goodness, prior_noise_goodness
@@ -300,14 +302,10 @@ class MAP():
         Calculate the weighting of the prior information for the posterior PDF
         """
         # calculate the variability part
-        # TODO: pull out this scaling coeff. Why is is 2 in Kepler PDC?
-        prior_pdf_variability_weight = 2.0
-        part_var = (1 + cbvs.variability[self.tus_id])**prior_pdf_variability_weight
+        part_var = (1 + cbvs.variability[self.tus_id])**self.prior_pdf_variability_weight
 
         # calculate the prior goodness part
-        prior_goodness_gain = 1.0
-        prior_goodness_weight = 0.5
-        part_gen_goodness = prior_goodness_gain * (self.prior_general_goodness**prior_goodness_weight)
+        part_gen_goodness = self.prior_pdf_goodness_gain * (self.prior_general_goodness**self.prior_pdf_goodness_weight)
         prior_weight = part_var * part_gen_goodness
         return prior_weight, part_var, part_gen_goodness
 
