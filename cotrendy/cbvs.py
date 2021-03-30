@@ -115,6 +115,7 @@ class CBVs():
         # placeholder for normalise variability stats
         self.normalised_variability_limit = config['cotrend']['normalised_variability_limit']
         self.prior_normalised_variability_limit = config['cotrend']['prior_normalised_variability_limit']
+        self.variability_normalisation_order = config['cotrend']['variability_normalisation_order']
 
         # the max number to look for
         self.max_n_cbvs = config['cotrend']['max_n_cbvs']
@@ -138,12 +139,12 @@ class CBVs():
         # get the threshold for entropy cleaning
         self.entropy_threshold = config['cotrend']['entropy_threshold']
         # get the limit on number of stars being rejected by entropy cleaning
-        n_entropy_rejections = config['cotrend']['n_entropy_rejections']
+        max_entropy_rejections = config['cotrend']['max_entropy_rejections']
         # if there is no limit on number of rejections, set it to 1 > size of lc_idx array
-        if n_entropy_rejections < 0:
-            self.n_entropy_rejections = len(self.lc_idx) + 1
+        if max_entropy_rejections < 0:
+            self.max_entropy_rejections = len(self.lc_idx) + 1
         else:
-            self.n_entropy_rejections = config['cotrend']['n_entropy_rejections']
+            self.max_entropy_rejections = config['cotrend']['max_entropy_rejections']
 
         # placeholders for variable star ids
         self.non_variable_star_idx = []
@@ -249,7 +250,7 @@ class CBVs():
             for target in self.targets:
                 delta_y.append(np.average(target.fluxerr_wtrend))
                 # TODO REMOVE 1st ORDER FIT!!!!!!
-                coeffs = np.polyfit(self.timesteps, target.flux_wtrend, 1)
+                coeffs = np.polyfit(self.timesteps, target.flux_wtrend, self.variability_normalisation_order)
                 besty = np.polyval(coeffs, self.timesteps)
                 # this was original flux_wtrend - besty, which seemed wrong
                 # as all the stars for CBVs were chosen as the fainest ones.
@@ -474,8 +475,8 @@ class CBVs():
                 self.norm_flux_array_for_cbvs_dithered = self.norm_flux_array_for_cbvs_dithered[star_no, :]
 
                 targets_removed += 1
-                if targets_removed >= self.n_entropy_rejections:
-                    logging.warning(f"Entropy cleaning rejection limit {self.n_entropy_rejections} reached, breaking")
+                if targets_removed >= self.max_entropy_rejections:
+                    logging.warning(f"Entropy cleaning rejection limit {self.max_entropy_rejections} reached, breaking")
                     break
                 elif len(self.norm_flux_array_for_cbvs_dithered) == 0:
                     logging.critical(f"Entropy cleaning has removed all stars, quitting!")

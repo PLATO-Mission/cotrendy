@@ -53,6 +53,7 @@ class MAP():
         self.hist_bins = 50
         self.prior_max_success = defaultdict(bool)
         self.prior_sigma_mask = None
+        self.prior_raw_goodness = 0.
         self.prior_general_goodness = 0.
         self.prior_noise_goodness = 0.
         self.prior_weight = 0.
@@ -61,7 +62,7 @@ class MAP():
         self.prior_cond_snapping = cbvs.prior_cond_snapping
         self.prior_snapped_to_cond = defaultdict(bool)
         # tuneable parameters
-        self.prior_alpha_g = cbvs.prior_alpha_g
+        self.prior_raw_goodness_weight = cbvs.prior_raw_goodness_weight
         self.prior_raw_goodness_exponent = cbvs.prior_raw_goodness_exponent
         self.prior_noise_goodness_weight = cbvs.prior_noise_goodness_weight
         self.prior_pdf_variability_weight = cbvs.prior_pdf_variability_weight
@@ -191,8 +192,8 @@ class MAP():
             sigma_fit_coeffs = cbvs.fit_coeffs[cbv_id][self.prior_sigma_mask]
             self.prior_sigma[cbv_id] = np.std(sigma_fit_coeffs)
 
-        self.prior_general_goodness, self.prior_noise_goodness = self.calculate_prior_goodness(cbvs)
-        self.prior_weight, self.prior_weight_pt_var, self.prior_weight_pt_gen_good = self.calculate_prior_weight(cbvs)
+        self.calculate_prior_goodness(cbvs)
+        self.calculate_prior_weight(cbvs)
 
     def calculate_prior_goodness(self, cbvs):
         """
@@ -213,27 +214,30 @@ class MAP():
 
         # calculate the general trend goodness
         x = np.arange(0, len(prior_fit))
-        coeffs = np.polyfit(x, cbvs.norm_flux_array[self.tus_id], 3)
+        # use the same fit order here as in variability calcs
+        coeffs = np.polyfit(x, cbvs.norm_flux_array[self.tus_id], cbvs.variability_normalisation_order)
         poly_fit = np.polyval(coeffs, x)
 
         # get the difference between the prior fit light curve and
         # a low order detrended light curve
-        diff_prior_to_poly = prior_fit - poly_fit
+        numerator = prior_fit - poly_fit
 
         # normalise by the mad of the polyfit removed light curve
-        abs_dev = mad(cbvs.norm_flux_array[self.tus_id] - poly_fit)
-        std_diff_prior_to_poly = np.std((diff_prior_to_poly/abs_dev) - 1)
+        denominator = mad(cbvs.norm_flux_array[self.tus_id] - poly_fit)
+        self.prior_raw_goodness = np.std((numerator/denominator) - 1)
 
         # the scaling values come from Kepler
         # a value near 0 is a bad prior goodness, a value near 1 is a good prior goodness
-        # TODO: how are these parameters in the equation determined?
-        prior_general_goodness = 1 - (std_diff_prior_to_poly/self.prior_alpha_g)**(self.prior_raw_goodness_exponent)
+        # NOTE: Kepler found that 1 - (G_raw/5.0)^3.0 was where the prior started to be bad
+        prior_general_goodness = 1 - (self.prior_raw_goodness/self.prior_raw_goodness_weight)**(self.prior_raw_goodness_exponent)
+        # NOTE: ^^^ is different to Smith paper. There they set Gpr = 0 if Graw < alpha_g.
 
         # set it to 0 if it's < 0
         if prior_general_goodness < 0.0:
             prior_general_goodness = 0.0
 
         # Now calculate the noise goodness metric
+        # NOTE: on closer inspection this statistic is not actually used anywhere? Check PDC source code
         _, psd_flux = periodogram(np.diff(cbvs.norm_flux_array[self.tus_id]), detrend=False)
         _, psd_prior = periodogram(np.diff(prior_fit), detrend=False)
 
@@ -241,8 +245,10 @@ class MAP():
         prior_noise_goodness = self.prior_noise_goodness_weight * np.sum(np.log(psd_ratio[psd_ratio > 1]**2))
         prior_noise_goodness = 1. / (prior_noise_goodness + 1)
 
-        return prior_general_goodness, prior_noise_goodness
+        self.prior_general_goodness = prior_general_goodness
+        self.prior_noise_goodness = prior_noise_goodness
 
+        # TODO: replicate the plots from Kepler pipeline here to inspect the prior fit goodness
 
     def calculate_conditional_pdfs(self, cbvs):
         """
@@ -302,12 +308,14 @@ class MAP():
         Calculate the weighting of the prior information for the posterior PDF
         """
         # calculate the variability part
-        part_var = (1 + cbvs.variability[self.tus_id])**self.prior_pdf_variability_weight
+        self.prior_weight_pt_var = (1 + cbvs.variability[self.tus_id])**self.prior_pdf_variability_weight
 
         # calculate the prior goodness part
-        part_gen_goodness = self.prior_pdf_goodness_gain * (self.prior_general_goodness**self.prior_pdf_goodness_weight)
-        prior_weight = part_var * part_gen_goodness
-        return prior_weight, part_var, part_gen_goodness
+        self.prior_weight_pt_gen_good = self.prior_pdf_goodness_gain * (self.prior_general_goodness**self.prior_pdf_goodness_weight)
+
+        # calculate the final prior weight based on variability and general goodness
+        self.prior_weight = self.prior_weight_pt_var * self.prior_weight_pt_gen_good
+
 
     def calculate_posterior_pdfs(self, cbvs):
         """
