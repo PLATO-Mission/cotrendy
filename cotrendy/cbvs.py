@@ -215,7 +215,7 @@ class CBVs():
         # TODO: remove the try after these parameters are standard in the config files
         try:
             self.prior_cond_snapping = config['cotrend']['prior_cond_snapping']
-            self.prior_alpha_g = config['cotrend']['prior_alpha_g']
+            self.prior_raw_goodness_weight = config['cotrend']['prior_raw_goodness_weight']
             self.prior_raw_goodness_exponent = config['cotrend']['prior_raw_goodness_exponent']
             self.prior_noise_goodness_weight = config['cotrend']['prior_noise_goodness_weight']
             self.prior_pdf_variability_weight = config['cotrend']['prior_pdf_variability_weight']
@@ -223,7 +223,7 @@ class CBVs():
             self.prior_pdf_goodness_weight = config['cotrend']['prior_pdf_goodness_weight']
         except KeyError:
             self.prior_cond_snapping = False
-            self.prior_alpha_g = 5.0
+            self.prior_raw_goodness_weight = 5.0
             self.prior_raw_goodness_exponent = 3.0
             self.prior_noise_goodness_weight = 0.002
             self.prior_pdf_variability_weight = 2.0
