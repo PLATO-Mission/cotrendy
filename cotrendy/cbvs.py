@@ -332,13 +332,13 @@ class CBVs():
         if initial:
             logging.info("Calculating the initial SVD...")
             self.U0, self.s0, self.VT0 = svd(self.norm_flux_array_for_cbvs_dithered.T)
-            output_filename = f"{self.direc}/singular_values_{self.camera_id}_{self.phot_file}_initial.png"
+            output_filename = f"{self.direc}/singular_values_{self.camera_id}_{self.phot_file}_initial.pdf"
             sing_vals = self.s0
             logging.info(f"Matrix shapes -  U: {self.U0.shape}, s: {self.s0.shape}, VT: {self.VT0.shape}")
         else:
             logging.info("Calculating the final SVD...")
             self.U, self.s, self.VT = svd(self.norm_flux_array_for_cbvs_dithered.T)
-            output_filename = f"{self.direc}/singular_values_{self.camera_id}_{self.phot_file}.png"
+            output_filename = f"{self.direc}/singular_values_{self.camera_id}_{self.phot_file}.pdf"
             sing_vals = self.s
             logging.info(f"Matrix shapes -  U: {self.U.shape}, s: {self.s.shape}, VT: {self.VT.shape}")
 
@@ -590,7 +590,7 @@ class CBVs():
 
         # TODO: calculate the CBV effectiveness scores as per TASOC
         # plot the CBVs for everyone to see
-        output_filename = f"{self.direc}/cbvs_{self.camera_id}_{self.phot_file}.png"
+        output_filename = f"{self.direc}/cbvs_{self.camera_id}_{self.phot_file}.pdf"
         fig, ax = plt.subplots(self.max_n_cbvs, figsize=(10, 10), sharex=True, sharey=True)
 
         # plot the initial CBVs, pre entropy cleaning
