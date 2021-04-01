@@ -546,10 +546,10 @@ class CBVs():
         # It seems to make sense that we only do an entropy check for the
         # highest SNR CBVs, so let's add an initial check here to determine how
         # many components to entropy check
-        n_components_to_entropy_check = self.max_n_cbvs
-        #for i in sorted(self.cbvs0):
-        #    if i == 0 or self.cbvs0_snr[i] >= self.cbvs_snr_limit:
-        #        n_components_to_entropy_check += 1
+        #n_components_to_entropy_check = self.max_n_cbvs
+        for i in sorted(self.cbvs0):
+            if i == 0 or self.cbvs0_snr[i] >= self.cbvs_snr_limit:
+                n_components_to_entropy_check += 1
 
         # do the entropy cleaning
         self.entropy_cleaning(n_components_to_entropy_check)
