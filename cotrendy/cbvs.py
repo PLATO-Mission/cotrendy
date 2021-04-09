@@ -32,7 +32,6 @@ from cotrendy.utils import picklify, depicklify
 # pylint: disable=invalid-name
 # pylint: disable=line-too-long
 
-# TODO update docstring when changes to method are done
 class CBVs():
     """
     A class to generate a series of cotrending basis vectors from
@@ -64,15 +63,9 @@ class CBVs():
              1. Anoise is the noise floor and is the first differences between adjacent fluxes
              1. Any CBVs < 5dB are removed
           1. An entropy check is made to eliminate domineering stars influencing the CBVs
-             1. The right hand singular vectors contain the contribution of the signal in the
-                basis vectors
-             1. These are the ROWS in VT
              1. Entropy is calculated using Eqs 13-16 in the Smith paper
                 1. They find anything with an entropy less than -0.7 was bad
                 1. Bad targets are removed and the SVD is done again until all are better than 0.7
-             1. However, I spoke with Tom Marsh and it seems like a simple itterative sigma
-                clip done on the outliers of objects in VT will do the same thing.
-                1. I've implemented this itterative sigma clip below
     """
     def __init__(self, config, timesteps, targets):
         """
@@ -249,7 +242,6 @@ class CBVs():
             sigma_y, delta_y = [], []
             for target in self.targets:
                 delta_y.append(np.average(target.fluxerr_wtrend))
-                # TODO REMOVE 1st ORDER FIT!!!!!!
                 coeffs = np.polyfit(self.timesteps, target.flux_wtrend, self.variability_normalisation_order)
                 besty = np.polyval(coeffs, self.timesteps)
                 # this was original flux_wtrend - besty, which seemed wrong
@@ -323,7 +315,8 @@ class CBVs():
 
         We apply a zero mean dither before hand
 
-        initial flag allows us to store results in 0 arrays.
+        Initial flag allows us to store results in arrays with 0 suffix, indicating initial pass.
+        .
         This allows a pre and post entropy cleaning check on the CBVs
         """
         # now we take the SVD of the highest correlated light curves
@@ -398,7 +391,7 @@ class CBVs():
         """
         Taken from TASOC code
 
-        Add docstring
+        Compute the entropy of each CBV compared to a Guassian
         """
         HGauss0 = 0.5 + 0.5*np.log(2*np.pi)
         nSingVals = U.shape[1]
@@ -431,8 +424,10 @@ class CBVs():
     def entropy_cleaning(self, ncomponents, random_state=999):
         """
         Entropy-cleaning of lightcurve matrix using the SVD U-matrix.
+        Identify stars which are increading the entropy of the CBVs, remove them
+        and repeat until there is no overrepresentation (typically entropy < -0.7)
 
-        TODO: fix docstring
+        This is taken directly from the TASOC pipeline
         """
         # conversion constant from MAD to Sigma. Constant is 1/norm.ppf(3/4)
         mad_to_sigma = 1.482602218505602
@@ -491,7 +486,15 @@ class CBVs():
 
     def calculate_cbvs(self):
         """
-        Generate the CBVs from the SVD output
+        Generate the CBVs from the input array normalised fluxes
+
+        1. Calculate normalised variability, remove those above variability limit
+        2. Calculate the median absolute correlation for surviving objects, keep top N%
+        3. Dither surviving light curves
+        4. Do an initial SVD, check the SNR of each CBV, remove those < SNR limit
+        5. Check the entropy of each CBV, remove any stars that are over representend
+        6. Iterate SVD, entropy rejection until CBVs have entropy < entropy limit
+        7. Store the final vectors for use and make some summary plots of singular values etc
         """
         logging.info("Calculating CBVs...")
 
@@ -567,10 +570,6 @@ class CBVs():
         # check the final CBV SNRs and remove (or not) any
         to_delete = []
         for i in sorted(self.cbvs):
-            # TODO: cbv_id 0 often comes out with low SNR
-            # Decide on whether to keep it or not. BOL4_subset_frac data has it in
-            # BOL4_subset_frac_ignore_me data will be a test without it.
-            #if self.cbvs_snr[i] < self.cbvs_snr_limit:
             if i != 0 and self.cbvs_snr[i] < self.cbvs_snr_limit:
                 logging.info(f"Low SNR CBV {i}, deleting!")
                 to_delete.append(i)
@@ -860,8 +859,6 @@ class CBVs():
     def cotrend_data_ls(self):
         """
         Directly fit the CBVs to the data and ignore prior information
-
-        This is the simpler approach while the kinks in MAP are worked out
         """
         cotrending_flux_array = []
 
