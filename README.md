@@ -9,61 +9,110 @@ A complete rewrite and generalisation of Trendy
 Cotrendy is setup using a configuration file in the [TOML format](https://github.com/toml-lang/toml). Below is an example configuration file. Each parameter is explained using inline comments.
 
 ```toml
-# This is a TOML config file for TESS Sector S05
+# This is a TOML config file for c01_q00
 [owner]
 name = "James McCormac"
-version = "0.0.1"
+version = "0.1.0"
 
 [global]
 # enable debugging mode?
+# default = true
 debug = true
 # working directory
-root = "/tess/photometry/tessFFIextract/lightcurves/S05_1-1"
+root = "/ngts/scratch/jmcc/psls_simulations_2021/BOL4_2k_bm"
 # time slot identifier, quarter, night etc
-timeslot = "S05"
+timeslot = "c01_q00"
 # camera_id
-camera_id = "1-1"
+camera_id = "c01"
 
 [data]
 # a file containing times, this should be the same length as each star row below
-time_file = "tess_S05_1-1_times.pkl"
+time_file = "c01_q00_times.pkl"
 # a file containing fluxes (1 row per star)
-flux_file = "tess_S05_1-1_fluxes.pkl"
+flux_file = "c01_q00_fluxes.pkl"
 # a file containing errors on flxues (1 row per star)
-error_file = "tess_S05_1-1_errors.pkl"
+error_file = "c01_q00_errors.pkl"
+# normalised variability file (1 value per star). This is used to override internal
+# normalised variability calculations
+variability_file = ""
 # mask file to exclude cadences from CBV fitting
-cadence_mask_file = "/tess/photometry/tessFFIextract/masks/S05_1-1_mask.fits"
-# name of the cbv pickle file
-cbv_file = "tess_S05_1-1_cbvs.pkl"
+# default = ""
+cadence_mask_file = ""
+# name of the output cbv pickle file
+cbv_file = "c01_q00_cbvs.pkl"
 # file with ids of objects considered for CVBs
-objects_mask_file = "tess_S05_1-1_objects_mask.pkl"
+objects_mask_file = "c01_objects_mask.pkl"
 # reject outliers in the data, as per PLATO outlier rejection?
+# default = false
 reject_outliers = false
 
 [catalog]
-# Master input catalog
-master_cat_file = "/tess/photometry/tessFFIextract/sources/S05_1-1.fits"
-# CBV input catalogs - these are the stars kept for making the CBVs
-# ra, dec, mag, id
-input_cat_file = "tess_S05_1_1_cat.pkl"
+# CBV input catalog. Format is currently ra, dec, mag, id
+input_cat_file = "c01_catalog.pkl"
+# coords units, are they in degrees for ra/dec or pix for X/Y, "radec" or "pix"
+# default = "radec"
+coords_units = "pix"
 # MAP weights for ra, dec and mag
+# default = [1, 1, 2]
 dim_weights = [1, 1, 2]
 
 [cotrend]
 # number of workers in multiprocessing pool
-pool_size = 40
+# default = 2
+pool_size = 2
 # maximum number of CBVs to attempt extracting
-max_n_cbvs = 8
+# default = 12
+max_n_cbvs = 12
 # SNR limit for significant cbvs, those with lower SNR are excluded
+# default = 5
 cbv_snr_limit = 5
-# set if we want LS or MAP fitting - NOTE: MAP still needs some work
+# set if we want LS or MAP fitting
+# default = "LS"
 cbv_mode = "LS"
+# set the variability normalisation order, this is the order of coarse detrend
+# when determining the normalised variability for each star in a set
+# default = 3
+variability_normalisation_order = 3
 # set the normalised variability limit
+# default = 1.3
 normalised_variability_limit = 1.3
+# correlation threshold, the top fraction of correlated stars for CBVs
+# default = 0.5
+correlation_threshold = 0.5                                           
+# entropy cleaning threshold   
+# default = -0.7
+entropy_threshold = -0.7         
+# entropy cleaning rejection limit - how many stars can be rejected?
+# set a -ve number for no limit
+# default = -1
+max_entropy_rejections = -1
 # set the normalised variability limit below which priors are not used
-prior_normalised_variability_limit = 0.85
+# default = 0.7
+prior_normalised_variability_limit = 0.7
+# enable or disable snapping of posterior to conditional if within prior_sigma of prior
+# default = false
+prior_cond_snapping = false
+# prior raw goodness weight, emperical parameter from PDC pipeline see eq. 19 Smith et al. 2012
+# default = 5.0
+prior_raw_goodness_weight = 5.0
+# prior raw goodness exponent from PDC pipeline see eq. 19 Smith et al. 2012
+# default = 3.0
+prior_raw_goodness_exponent = 3.0
+# prior noise weight (extra param, post Smith 2012)
+# default = 0.0002
+prior_noise_goodness_weight = 0.0002
+# scaling parameter for the variability part of the prior weight calculation
+# default = 2.0
+prior_pdf_variability_weight = 2.0
+# gain for the goodness part of prior pdf weighting
+# default = 1.0
+prior_pdf_goodness_gain = 1.0
+# weight for the goodness part of prior pdf weighting
+# default = 0.5
+prior_pdf_goodness_weight = 0.5
 # take a few test case stars to plot PDFs etc
-test_stars = [10,100,1000]
+# default = []
+test_stars = []
 ```
 
 ### Catalog
