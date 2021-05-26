@@ -36,7 +36,6 @@ if __name__ == "__main__":
     root = config['global']['root']
     cbv_pickle_file = config['data']['cbv_file']
     cbv_pickle_file_output = f"{root}/{cbv_pickle_file}"
-    cbv_fit_method = config['cotrend']['cbv_fit_method']
 
     # load the external catalog
     catalog = Catalog(config)
@@ -63,12 +62,9 @@ if __name__ == "__main__":
         cuts.picklify(cbv_pickle_file_output, cbvs)
 
         # work out the fit coefficients, needed for the Prior PDF
-        # calculate them either simultaneously for all CBVs or sequentially
-        # from the first to last
-        if cbv_fit_method == "sequential":
-            cbvs.calculate_robust_fit_coeffs_sequen()
-        else:
-            cbvs.calculate_robust_fit_coeffs_simult()
+        # calculate them for all CBVs sequentially from the first to last
+        cbvs.calculate_robust_fit_coeffs_sequen()
+
         # pickle the intermediate CBVs object incase it crashes later
         cuts.picklify(cbv_pickle_file_output, cbvs)
 

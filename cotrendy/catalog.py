@@ -15,7 +15,7 @@ class Catalog():
     """
     External information on the targets to detrend
     """
-    def __init__(self, config, apply_object_mask):
+    def __init__(self, config, apply_object_mask=True):
         """
         Initialise the class
 
