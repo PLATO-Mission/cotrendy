@@ -8,7 +8,7 @@ import traceback
 import logging
 from datetime import datetime
 from functools import partial
-from multiprocessing import Pool
+from multiprocess import Pool
 from collections import defaultdict
 import numpy as np
 from scipy.linalg import svd
