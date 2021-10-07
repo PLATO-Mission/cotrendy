@@ -838,15 +838,21 @@ class CBVs():
         correction = np.empty((len(target_ids), n_data_points))
 
         # collect together constants for giving to pool
+        logging.info(f"Before pool, making const...")
         const = (catalog, self, camera_id, timeslot)
 
         # the old way of plotting with no thread locking
         # however, we just plot with a different script now for speed
         # make a partial function with the constants baked in
+        logging.info(f"Before pool, making fn...")
         fn = partial(worker_fn, constants=const)
         # run a pool of N workers and set them detrending
         with Pool(self.pool_size) as pool:
+            logging.info(f"Inside pool, trying to map...")
             results = pool.map(fn, target_ids)
+
+        # debugging statement
+        logging.info(f"Outside pool, did it work?...")
 
         # collect the results and make a correction array
         for r, c in results:
@@ -883,6 +889,7 @@ def worker_fn(star_id, constants):
     and the star_id as a changing variable to select the
     right parts of the constant data to perform the cotrending
     """
+    logging.info(f"In worker_fn...")
     # get the time the function started to check concurrency
     start = datetime.utcnow()
 
