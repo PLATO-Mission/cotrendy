@@ -846,28 +846,29 @@ class CBVs():
         #const = (catalog, self, camera_id, timeslot)
 
         # make the new massive const tuple
-        const = (camera_id,
-                 timeslot,
-                 self.test_stars,
-                 self.debug,
-                 self.direc,
-                 self.cbvs,
-                 self.fit_coeffs,
-                 catalog,
-                 self.lc_idx_for_cbvs,
-                 self.theta,
-                 self.n_cbvs,
-                 self.variability_normalisation_order,
-                 self.prior_normalised_variability_limit,
-                 self.prior_cond_snapping,
-                 self.prior_raw_goodness_weight,
-                 self.prior_raw_goodness_exponent,
-                 self.prior_noise_goodness_weight,
-                 self.prior_pdf_variability_weight,
-                 self.prior_pdf_goodness_gain,
-                 self.prior_pdf_goodness_weight)
+        constants = (camera_id,
+                     timeslot,
+                     self.test_stars,
+                     self.debug,
+                     self.direc,
+                     self.cbvs,
+                     self.fit_coeffs,
+                     catalog,
+                     self.lc_idx_for_cbvs,
+                     self.theta,
+                     self.n_cbvs,
+                     self.variability_normalisation_order,
+                     self.prior_normalised_variability_limit,
+                     self.prior_cond_snapping,
+                     self.prior_raw_goodness_weight,
+                     self.prior_raw_goodness_exponent,
+                     self.prior_noise_goodness_weight,
+                     self.prior_pdf_variability_weight,
+                     self.prior_pdf_goodness_gain,
+                     self.prior_pdf_goodness_weight)
 
         # make the new large itterable for star_ids, fluxes and variability
+        # TODO: Is there an issue here?
         big_map_itterable = []
         for i, j, k in zip(target_ids, self.norm_flux_array, self.variability):
             big_map_itterable.append([i, j, k])
@@ -876,7 +877,7 @@ class CBVs():
         # however, we just plot with a different script now for speed
         # make a partial function with the constants baked in
         logging.info("Before pool, making fn...")
-        fn = partial(worker_fn, constants=const)
+        fn = partial(worker_fn, constants=constants)
 
         # run a pool of N workers and set them detrending
         with Pool(self.pool_size) as pool:
