@@ -31,6 +31,10 @@ from cotrendy.utils import picklify, depicklify
 
 # pylint: disable=invalid-name
 # pylint: disable=line-too-long
+# pylint: disable=logging-fstring-interpolation
+
+# TODO: move making theta to inside MAP.
+#       make it encompass both cond and prior vals so it doesn't fail!
 
 class CBVs():
     """
@@ -474,7 +478,7 @@ class CBVs():
                     logging.warning(f"Entropy cleaning rejection limit {self.max_entropy_rejections} reached, breaking")
                     break
                 elif len(self.norm_flux_array_for_cbvs_dithered) == 0:
-                    logging.critical(f"Entropy cleaning has removed all stars, quitting!")
+                    logging.critical("Entropy cleaning has removed all stars, quitting!")
                     sys.exit(1)
 
                 U, _, _ = pca._fit(self.norm_flux_array_for_cbvs_dithered)
@@ -838,21 +842,50 @@ class CBVs():
         correction = np.empty((len(target_ids), n_data_points))
 
         # collect together constants for giving to pool
-        logging.info(f"Before pool, making const...")
-        const = (catalog, self, camera_id, timeslot)
+        logging.info("Before pool, making const...")
+        #const = (catalog, self, camera_id, timeslot)
+
+        # make the new massive const tuple
+        const = (camera_id,
+                 timeslot,
+                 self.test_stars,
+                 self.debug,
+                 self.direc,
+                 self.cbvs,
+                 self.fit_coeffs,
+                 catalog,
+                 self.lc_idx_for_cbvs,
+                 self.theta,
+                 self.n_cbvs,
+                 self.variability_normalisation_order,
+                 self.prior_normalised_variability_limit,
+                 self.prior_cond_snapping,
+                 self.prior_raw_goodness_weight,
+                 self.prior_raw_goodness_exponent,
+                 self.prior_noise_goodness_weight,
+                 self.prior_pdf_variability_weight,
+                 self.prior_pdf_goodness_gain,
+                 self.prior_pdf_goodness_weight)
+
+        # make the new large itterable for star_ids, fluxes and variability
+        big_map_itterable = []
+        for i, j, k in zip(target_ids, self.norm_flux_array, self.variability):
+            big_map_itterable.append([i, j, k])
 
         # the old way of plotting with no thread locking
         # however, we just plot with a different script now for speed
         # make a partial function with the constants baked in
-        logging.info(f"Before pool, making fn...")
+        logging.info("Before pool, making fn...")
         fn = partial(worker_fn, constants=const)
+
         # run a pool of N workers and set them detrending
         with Pool(self.pool_size) as pool:
-            logging.info(f"Inside pool, trying to map...")
-            results = pool.map(fn, target_ids)
+            logging.info("Inside pool, trying to map...")
+            #results = pool.map(fn, target_ids)
+            results = pool.starmap(fn, big_map_itterable)
 
         # debugging statement
-        logging.info(f"Outside pool, did it work?...")
+        logging.info("Outside pool, did it work?...")
 
         # collect the results and make a correction array
         for r, c in results:
@@ -883,46 +916,55 @@ class CBVs():
         self.cotrended_flux_array = self.norm_flux_array - self.cotrending_flux_array
 
 # multiprocessing worker function
-def worker_fn(star_id, constants):
+def worker_fn(itterable, constants):
     """
     Take in the constant items under the constants tuple
     and the star_id as a changing variable to select the
     right parts of the constant data to perform the cotrending
     """
-    logging.info(f"In worker_fn...")
+    logging.info("In worker_fn...")
     # get the time the function started to check concurrency
     start = datetime.utcnow()
 
     # unpack constants
-    catalog, cbvs, camera_id, timeslot = constants
+    #catalog, cbvs, camera_id, timeslot = constants
+
+    # lazy unpack the new large const tuple
+    # packing order with these at the start allows us to lazy unpack here
+    # as we only need some info for this function, rest is destined for MAP
+    camera_id, timeslot, test_stars, debug, direc, cbvs, fit_coeffs, *_ = constants
+
+    # unpack the itterable
+    star_id, norm_flux, variability = itterable
 
     try:
-        mapp = MAP(catalog, cbvs, star_id)
+        # TODO: fix this call and then catching info in MAP
+        mapp = MAP(star_id, norm_flux, variability, constants)
     except Exception:
         # return the star_id and all zeros for the correction
         # if the mapp processing fails
         traceback.print_exc(file=sys.stdout)
         logging.warning("MAP failed, skipping...")
-        n_data_points = len(cbvs.norm_flux_array[0])
+        n_data_points = len(norm_flux)
         return star_id, np.zeros(n_data_points)
 
     # make plots for the test stars
-    if star_id in cbvs.test_stars or cbvs.debug:
+    if star_id in test_stars or debug:
         # debug plotting moved out of the main script
         # pickle the MAP object also for inspection
-        map_filename = f"{cbvs.direc}/{camera_id}_{timeslot}_{star_id}_map.pkl"
+        map_filename = f"{direc}/{camera_id}_{timeslot}_{star_id}_map.pkl"
         picklify(map_filename, mapp)
 
     # try to use our super duper new posterior PDF
     correction_to_apply = []
-    for cbv_id in sorted(cbvs.cbvs.keys()):
+    for cbv_id in sorted(cbvs.keys()):
         # if MAP succeeded, use the posterior, else fall back to LS results
         if mapp.mode == "MAP":
             final_coeff = mapp.posterior_peak_theta[cbv_id]
         else:
-            final_coeff = cbvs.fit_coeffs[cbv_id][star_id]
+            final_coeff = fit_coeffs[cbv_id][star_id]
 
-        component = cbvs.cbvs[cbv_id]*final_coeff
+        component = cbvs[cbv_id]*final_coeff
         correction_to_apply.append(component)
 
     # sum up the scaled CBVs then do the correction

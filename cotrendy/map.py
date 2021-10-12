@@ -12,6 +12,8 @@ from scipy.signal import periodogram
 # pylint: disable=invalid-name
 # pylint: disable=line-too-long
 
+# TODO: fix docstrings
+
 class MAP():
     """
     Take a set of CBVs fit coeffs and use the MAP method
@@ -20,8 +22,12 @@ class MAP():
     There is a MAP instance for each light curve
 
     PDFs and parameters are indexed by CBV_id
+
+    # new class initialisation
+    mapp = MAP(tus_id, norm_flux, variabilty, const)
+
     """
-    def __init__(self, catalog, cbvs, tus_id):
+    def __init__(self, tus_id, norm_flux, variability, const):
         """
         Initialise the MAP class
 
@@ -35,13 +41,34 @@ class MAP():
         tus_id : int
             Current target index being analysed
         """
+
+        # unpack new const tuple
+        _, _, _, _, direc, cbvs, fit_coeffs, catalog, \
+        lc_idx_for_cbvs, theta, n_cbvs, \
+        variability_normalisation_order, \
+        prior_normalised_variability_limit, \
+        prior_cond_snapping, \
+        prior_raw_goodness_weight, \
+        prior_raw_goodness_exponent, \
+        prior_noise_goodness_weight, \
+        prior_pdf_variability_weight, \
+        prior_pdf_goodness_gain, \
+        prior_pdf_goodness_weight = const
+
+        # propogate itterables through
         self.tus_id = tus_id
-        self.direc = cbvs.direc
+        self.norm_flux = norm_flux
+        self.variability = variability
+
+        # general variables
+        self.direc = direc
         self.id = int(catalog.ids[tus_id])
         self.mag = round(catalog.mag[tus_id], 2)
-
-        # overall flags for MAP
         self.mode = "MAP"
+
+        # variability variables
+        self.variability_normalisation_order = variability_normalisation_order
+        self.prior_normalised_variability_limit = prior_normalised_variability_limit
 
         # prior PDF
         self.distances = None
@@ -59,15 +86,16 @@ class MAP():
         self.prior_weight = 0.
         self.prior_weight_pt_var = 0.
         self.prior_weight_pt_gen_good = 0.
-        self.prior_cond_snapping = cbvs.prior_cond_snapping
+        self.prior_cond_snapping = prior_cond_snapping
         self.prior_snapped_to_cond = defaultdict(bool)
+
         # tuneable parameters
-        self.prior_raw_goodness_weight = cbvs.prior_raw_goodness_weight
-        self.prior_raw_goodness_exponent = cbvs.prior_raw_goodness_exponent
-        self.prior_noise_goodness_weight = cbvs.prior_noise_goodness_weight
-        self.prior_pdf_variability_weight = cbvs.prior_pdf_variability_weight
-        self.prior_pdf_goodness_gain = cbvs.prior_pdf_goodness_gain
-        self.prior_pdf_goodness_weight = cbvs.prior_pdf_goodness_weight
+        self.prior_raw_goodness_weight = prior_raw_goodness_weight
+        self.prior_raw_goodness_exponent = prior_raw_goodness_exponent
+        self.prior_noise_goodness_weight = prior_noise_goodness_weight
+        self.prior_pdf_variability_weight = prior_pdf_variability_weight
+        self.prior_pdf_goodness_gain = prior_pdf_goodness_gain
+        self.prior_pdf_goodness_weight = prior_pdf_goodness_weight
 
         # conditioanl PDF
         self.cond_pdf = defaultdict(np.array)
@@ -83,35 +111,35 @@ class MAP():
 
         # make a mask to exclude the current tus
         # if there is a cbv mask we check this object is not in there
-        mask = np.where(cbvs.lc_idx_for_cbvs != tus_id)[0]
-        self.prior_mask = cbvs.lc_idx_for_cbvs[mask]
+        mask = np.where(lc_idx_for_cbvs != tus_id)[0]
+        self.prior_mask = lc_idx_for_cbvs[mask]
 
         # calculate the PDFs
-        self.calculate_prior_pdfs(catalog, cbvs)
+        self.calculate_prior_pdfs(catalog, cbvs, fit_coeffs, theta, n_cbvs)
 
         # analyse the info we have, if the prior_goodness is poor
         # or the star is quiet, break back to a pure LS fit and
         # ignore the rest of the MAP analysis
         if self.prior_general_goodness < 0.1 or \
-                cbvs.variability[self.tus_id] < cbvs.prior_normalised_variability_limit:
+                self.variability < self.prior_normalised_variability_limit:
             self.mode = "LS"
             # we stop here and MAP defaults to LS
         else:
-            self.calculate_conditional_pdfs(cbvs)
+            self.calculate_conditional_pdfs(cbvs, theta)
 
             # finally combine the PDFs above into the posterior and maximise
-            self.calculate_posterior_pdfs(cbvs)
+            self.calculate_posterior_pdfs(cbvs, theta)
 
             failures = 0
             # check if any maximising failed
-            for cbv_id in sorted(cbvs.cbvs.keys()):
+            for cbv_id in sorted(cbvs.keys()):
                 if not self.prior_max_success[cbv_id] or not self.cond_max_success[cbv_id] or not \
                     self.posterior_max_success[cbv_id]:
                     failures += 1
             if failures > 0:
                 self.mode = "LS"
 
-    def calculate_prior_pdfs(self, catalog, cbvs):
+    def calculate_prior_pdfs(self, catalog, cbvs, fit_coeffs, theta, n_cbvs):
         """
         Calculate the weights for all SVD stars compared to the TUS
 
@@ -165,12 +193,12 @@ class MAP():
         weights_norm_const = np.sum(weights_unnormalised)
         weights = weights_unnormalised / weights_norm_const
 
-        for cbv_id in sorted(cbvs.cbvs):
-            self.prior_pdf[cbv_id] = self._kde_scipy(cbvs.fit_coeffs[cbv_id][self.prior_mask],
-                                                     cbvs.theta[cbv_id], weights=weights)
+        for cbv_id in sorted(cbvs):
+            self.prior_pdf[cbv_id] = self._kde_scipy(fit_coeffs[cbv_id][self.prior_mask],
+                                                     theta[cbv_id], weights=weights)
 
             # maximise the prior PDF
-            peak_theta, peak_pdf = self._maximise_pdf(cbvs.theta[cbv_id],
+            peak_theta, peak_pdf = self._maximise_pdf(theta[cbv_id],
                                                       self.prior_pdf[cbv_id],
                                                       'prior')
 
@@ -185,17 +213,17 @@ class MAP():
                 self.prior_peak_pdf[cbv_id] = peak_pdf
 
             # calculate the integral of the weighted PDF, it should be close to 1
-            dx = cbvs.theta[cbv_id][1] - cbvs.theta[cbv_id][0]
+            dx = theta[cbv_id][1] - theta[cbv_id][0]
             self.prior_pdf_integral[cbv_id] = simps(self.prior_pdf[cbv_id], dx=dx)
 
             # work out sigma for this cbv
-            sigma_fit_coeffs = cbvs.fit_coeffs[cbv_id][self.prior_sigma_mask]
+            sigma_fit_coeffs = fit_coeffs[cbv_id][self.prior_sigma_mask]
             self.prior_sigma[cbv_id] = np.std(sigma_fit_coeffs)
 
-        self.calculate_prior_goodness(cbvs)
-        self.calculate_prior_weight(cbvs)
+        self.calculate_prior_goodness(cbvs, n_cbvs)
+        self.calculate_prior_weight()
 
-    def calculate_prior_goodness(self, cbvs):
+    def calculate_prior_goodness(self, cbvs, n_cbvs):
         """
         Analyse the prior fit and see if it is better or
         worse than expected.
@@ -204,18 +232,24 @@ class MAP():
         order polyfit) and a noise goodness, by comparing periodograms
         of the diffs of the uncorrected data and the prior fit
         """
+        vect_store = []
+        for c in sorted(cbvs.keys()):
+            vect_store.append(cbvs[c])
+        # make them into a numpy array
+        vect_store = np.array(vect_store)
+
         # generate the prior fit light curve
         prior_coeffs = []
-        for cbv_id in sorted(cbvs.cbvs.keys()):
+        for cbv_id in sorted(cbvs.keys()):
             prior_coeffs.append(self.prior_peak_theta[cbv_id])
-        prior_coeffs = np.array(prior_coeffs).reshape(cbvs.n_cbvs, -1)
-        prior_components = cbvs.vect_store * prior_coeffs
+        prior_coeffs = np.array(prior_coeffs).reshape(n_cbvs, -1)
+        prior_components = vect_store * prior_coeffs
         prior_fit = np.sum(prior_components, axis=0)
 
         # calculate the general trend goodness
         x = np.arange(0, len(prior_fit))
         # use the same fit order here as in variability calcs
-        coeffs = np.polyfit(x, cbvs.norm_flux_array[self.tus_id], cbvs.variability_normalisation_order)
+        coeffs = np.polyfit(x, self.norm_flux, self.variability_normalisation_order)
         poly_fit = np.polyval(coeffs, x)
 
         # get the difference between the prior fit light curve and
@@ -223,7 +257,7 @@ class MAP():
         numerator = prior_fit - poly_fit
 
         # normalise by the mad of the polyfit removed light curve
-        denominator = mad(cbvs.norm_flux_array[self.tus_id] - poly_fit)
+        denominator = mad(self.norm_flux - poly_fit)
         self.prior_raw_goodness = np.std((numerator/denominator) - 1)
 
         # the scaling values come from Kepler
@@ -238,7 +272,7 @@ class MAP():
 
         # Now calculate the noise goodness metric
         # NOTE: on closer inspection this statistic is not actually used anywhere? Check PDC source code
-        _, psd_flux = periodogram(np.diff(cbvs.norm_flux_array[self.tus_id]), detrend=False)
+        _, psd_flux = periodogram(np.diff(self.norm_flux), detrend=False)
         _, psd_prior = periodogram(np.diff(prior_fit), detrend=False)
 
         psd_ratio = psd_prior / psd_flux
@@ -250,7 +284,7 @@ class MAP():
 
         # TODO: replicate the plots from Kepler pipeline here to inspect the prior fit goodness
 
-    def calculate_conditional_pdfs(self, cbvs):
+    def calculate_conditional_pdfs(self, cbvs, theta):
         """
         Generate the conditional PDF for each CBV
 
@@ -262,30 +296,30 @@ class MAP():
             Contains information about the basis vectors
         """
         # keep a running total of the fit residuals, starting with the data
-        data = np.copy(cbvs.norm_flux_array[self.tus_id])
+        data = np.copy(self.norm_flux)
         # CBV ID 0 may not always be there, get the smallest number
-        valid_cbv_id = sorted(cbvs.theta.keys())[0]
+        valid_cbv_id = sorted(theta.keys())[0]
         # number of thetas to try
-        n_theta = len(cbvs.theta[valid_cbv_id])
+        n_theta = len(theta[valid_cbv_id])
         # grab the stddev of the data
         sigma = np.std(data)
 
         # loop over the CBVs
-        for cbv_id in sorted(cbvs.cbvs):
+        for cbv_id in sorted(cbvs.keys()):
             # make a 2D copy of the light curve theta times
             # each successive CBV will be subtracted and a conditional made
             fit_residuals = data.repeat(n_theta).reshape(len(data), n_theta)
 
             # scale CBV by each theta and subtract it to get the residuals
-            for i, t in enumerate(cbvs.theta[cbv_id]):
-                fit_residuals[:, i] -= cbvs.cbvs[cbv_id]*t
+            for i, t in enumerate(theta[cbv_id]):
+                fit_residuals[:, i] -= cbvs[cbv_id]*t
 
             # generate the conditional PDF from the fit residuals
             self.cond_pdf[cbv_id] = -1./(2.*(sigma**2)) * np.diag(np.dot(fit_residuals.T,
                                                                          fit_residuals))
 
             # maximise the conditional PDF
-            peak_theta, peak_pdf = self._maximise_pdf(cbvs.theta[cbv_id],
+            peak_theta, peak_pdf = self._maximise_pdf(theta[cbv_id],
                                                       self.cond_pdf[cbv_id],
                                                       'cond')
 
@@ -300,15 +334,15 @@ class MAP():
                 self.cond_peak_pdf[cbv_id] = peak_pdf
 
             # update the data and sigma for the next round
-            data = data - (cbvs.cbvs[cbv_id] * self.cond_peak_theta[cbv_id])
+            data = data - (cbvs[cbv_id] * self.cond_peak_theta[cbv_id])
             sigma = np.std(data)
 
-    def calculate_prior_weight(self, cbvs):
+    def calculate_prior_weight(self):
         """
         Calculate the weighting of the prior information for the posterior PDF
         """
         # calculate the variability part
-        self.prior_weight_pt_var = (1 + cbvs.variability[self.tus_id])**self.prior_pdf_variability_weight
+        self.prior_weight_pt_var = (1 + self.variability)**self.prior_pdf_variability_weight
 
         # calculate the prior goodness part
         self.prior_weight_pt_gen_good = self.prior_pdf_goodness_gain * (self.prior_general_goodness**self.prior_pdf_goodness_weight)
@@ -317,7 +351,7 @@ class MAP():
         self.prior_weight = self.prior_weight_pt_var * self.prior_weight_pt_gen_good
 
 
-    def calculate_posterior_pdfs(self, cbvs):
+    def calculate_posterior_pdfs(self, cbvs, theta):
         """
         Generate the posterior PDF for each CBV
 
@@ -328,7 +362,7 @@ class MAP():
         cbvs : CBVs object
             Contains information about the basis vectors
         """
-        for cbv_id in sorted(cbvs.cbvs):
+        for cbv_id in sorted(cbvs.keys()):
             # make the check for conditional and prior being within 1 sigma
             # if so, skip the posterior and snap to the conditional only
             sigma_snap_llim = self.prior_peak_theta[cbv_id] - self.prior_sigma[cbv_id]
@@ -342,7 +376,7 @@ class MAP():
             else:
                 posterior = self.cond_pdf[cbv_id] + np.log(self.prior_pdf[cbv_id])*self.prior_weight
                 self.posterior_pdf[cbv_id] = posterior
-                peak_theta, peak_pdf = self._maximise_pdf(cbvs.theta[cbv_id],
+                peak_theta, peak_pdf = self._maximise_pdf(theta[cbv_id],
                                                           posterior,
                                                           'posterior')
                 self.prior_snapped_to_cond[cbv_id] = False
