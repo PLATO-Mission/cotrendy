@@ -916,7 +916,7 @@ class CBVs():
         self.cotrended_flux_array = self.norm_flux_array - self.cotrending_flux_array
 
 # multiprocessing worker function
-def worker_fn(itterable, constants):
+def worker_fn(star_id, norm_flux, variability, constants):
     """
     Take in the constant items under the constants tuple
     and the star_id as a changing variable to select the
@@ -933,9 +933,6 @@ def worker_fn(itterable, constants):
     # packing order with these at the start allows us to lazy unpack here
     # as we only need some info for this function, rest is destined for MAP
     camera_id, timeslot, test_stars, debug, direc, cbvs, fit_coeffs, *_ = constants
-
-    # unpack the itterable
-    star_id, norm_flux, variability = itterable
 
     try:
         # TODO: fix this call and then catching info in MAP
