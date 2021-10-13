@@ -183,6 +183,9 @@ class CBVs():
         # keep the theta grids for the PDFs in MAP
         self.theta = defaultdict(np.array)
 
+        # store the MAP execution times for analysis of mp
+        self.map_exec_times = None
+
         # keep placeholder for cotrending and cotrended arrays
         self.cotrending_flux_array = None
         self.cotrended_flux_array = None
@@ -831,12 +834,66 @@ class CBVs():
                 pdf.savefig()
                 plt.close()
 
+    def cotrend_data_map_no_mp(self, catalog, camera_id, timeslot):
+        """
+        Process the data using MAP but in a cingle core
+
+        This is mainly used for testing the times to execution for different stars
+        """
+        target_ids = np.arange(0, len(self.norm_flux_array))
+        n_data_points = len(self.norm_flux_array[0])
+
+        # make an empty array for holding the correction
+        correction = np.empty((len(target_ids), n_data_points))
+
+        # collect together constants for giving to pool
+        logging.info("Running detrending in single core, making const...")
+        #const = (catalog, self, camera_id, timeslot)
+
+        # make the new massive const tuple
+        constants = (camera_id,
+                     timeslot,
+                     self.test_stars,
+                     self.debug,
+                     self.direc,
+                     self.cbvs,
+                     self.fit_coeffs,
+                     catalog,
+                     self.lc_idx_for_cbvs,
+                     self.theta,
+                     self.n_cbvs,
+                     self.variability_normalisation_order,
+                     self.prior_normalised_variability_limit,
+                     self.prior_cond_snapping,
+                     self.prior_raw_goodness_weight,
+                     self.prior_raw_goodness_exponent,
+                     self.prior_noise_goodness_weight,
+                     self.prior_pdf_variability_weight,
+                     self.prior_pdf_goodness_gain,
+                     self.prior_pdf_goodness_weight)
+
+        # loop over all target ids and call worker_fn manually and catch the results
+        for target_id in target_ids:
+            r, c, t = worker_fn(target_id, self.norm_flux_array[target_id],
+                                self.variability[target_id], constants)
+            correction[r] = c
+            exec_times.append(t)
+
+        # finally cotrend the lightcurves
+        self.cotrending_flux_array = correction
+        self.cotrended_flux_array = self.norm_flux_array - self.cotrending_flux_array
+        self.map_exec_times = np.array(exec_times)
+
+
     def cotrend_data_map_mp(self, catalog, camera_id, timeslot):
         """
         Use multiprocessing to speed up the cotrending of many lcs
         """
         target_ids = np.arange(0, len(self.norm_flux_array))
         n_data_points = len(self.norm_flux_array[0])
+
+        # store the execution times
+        exec_times = []
 
         # make an empty array for holding the correction
         correction = np.empty((len(target_ids), n_data_points))
@@ -889,12 +946,14 @@ class CBVs():
         logging.info("Outside pool, did it work?...")
 
         # collect the results and make a correction array
-        for r, c in results:
+        for r, c, t in results:
             correction[r] = c
+            exec_times.append(t)
 
         # finally cotrend the lightcurves
         self.cotrending_flux_array = correction
         self.cotrended_flux_array = self.norm_flux_array - self.cotrending_flux_array
+        self.map_exec_times = np.array(exec_times)
 
     def cotrend_data_ls(self):
         """
@@ -973,4 +1032,4 @@ def worker_fn(star_id, norm_flux, variability, constants):
     diff_time = (end - start).seconds
     logging.info(f"[{star_id}] Started: {start} - Finished: {end} - Runtime: {diff_time} sec")
 
-    return star_id, correction_to_apply
+    return star_id, correction_to_apply, diff_time
