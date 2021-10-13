@@ -843,6 +843,9 @@ class CBVs():
         target_ids = np.arange(0, len(self.norm_flux_array))
         n_data_points = len(self.norm_flux_array[0])
 
+        # store the execution times
+        exec_times = []
+
         # make an empty array for holding the correction
         correction = np.empty((len(target_ids), n_data_points))
 
