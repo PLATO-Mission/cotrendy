@@ -453,6 +453,8 @@ class CBVs():
 
         Compute the entropy of each CBV compared to a Guassian
         """
+        # TODO: remove later once new code is tested
+
         HGauss0 = 0.5 + 0.5*np.log(2*np.pi)
         nSingVals = U.shape[1]
         H = np.empty(nSingVals, dtype='float64')
@@ -489,6 +491,8 @@ class CBVs():
 
         This is taken directly from the TASOC pipeline
         """
+        # TODO: remove later once new code is tested
+
         # conversion constant from MAD to Sigma. Constant is 1/norm.ppf(3/4)
         mad_to_sigma = 1.482602218505602
         # added to track those rejected - jmcc
@@ -545,7 +549,7 @@ class CBVs():
         self.entropy_rejected_idx = rejected_idx
 
     @staticmethod
-    def compute_entropy2(VT):
+    def _compute_entropy2(VT):
         """
         Compute the entropy of each CBV compared to a Guassian
 
@@ -607,7 +611,7 @@ class CBVs():
         _, _, VT = self.calculate_svd(mode="entropy")
         VT = VT[:ncomponents]
 
-        ent = self.compute_entropy2(VT)
+        ent = self._compute_entropy2(VT)
         logging.info(f"Entropy start: {ent}")
 
         targets_removed = 0
@@ -649,7 +653,7 @@ class CBVs():
                 # limit VT to the first ncomponets rows
                 _, _, VT = self.calculate_svd(mode="entropy")
                 VT = VT[:ncomponents]
-                ent = self.compute_entropy2(VT)
+                ent = self._compute_entropy2(VT)
 
         logging.info(f"Entropy end: {ent}")
         logging.info(f"Targets removed: {targets_removed}")
