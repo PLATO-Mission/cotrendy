@@ -316,8 +316,10 @@ class CBVs():
         dither = np.random.normal(loc=0.0, scale=0.001, size=n_light_curves)
         self.norm_flux_array_for_cbvs_dithered = self.norm_flux_array_for_cbvs + dither.reshape(n_light_curves, 1)
 
-    def calculate_svd(self, initial=False):
+    def calculate_svd_old(self, initial=False):
         """
+        Replaced to make a more useful version of this function
+
         Take the previously filtered flux array and calculate the SVD
 
         We apply a zero mean dither before hand
@@ -326,6 +328,9 @@ class CBVs():
         .
         This allows a pre and post entropy cleaning check on the CBVs
         """
+
+        # TODO: delete this function later once tested
+
         # now we take the SVD of the highest correlated light curves
         # NOTE fluxes need to be in columns in order for the left-singular maxtrix (U)
         # to return us the CBVs in order
@@ -367,6 +372,54 @@ class CBVs():
         fig.clf()
         plt.close()
         gc.collect()
+
+    def calculate_svd(self, mode="initial"):
+        """
+        Take the previously filtered flux array and calculate the SVD
+
+        We apply a zero mean dither before hand
+
+        Initial flag allows us to store results in arrays with 0 suffix, indicating initial pass.
+        .
+        This allows a pre and post entropy cleaning check on the CBVs
+        """
+        # now we take the SVD of the highest correlated light curves
+        # NOTE fluxes need to be in columns in order for the left-singular maxtrix (U)
+        # to return us the CBVs in order
+        if mode == 'initial':
+            logging.info("Calculating the initial SVD...")
+            output_filename = f"{self.direc}/singular_values_{self.camera_id}_{self.phot_file}_initial.pdf"
+        elif mode == 'final':
+            logging.info("Calculating the final SVD...")
+            output_filename = f"{self.direc}/singular_values_{self.camera_id}_{self.phot_file}.pdf"
+        else:
+            logging.info("Calculating SVD for entropy cleaning...")
+
+        U, s, VT = svd(self.norm_flux_array_for_cbvs_dithered.T)
+        logging.info(f"Matrix shapes -  U: {self.U.shape}, s: {self.s.shape}, VT: {self.VT.shape}")
+
+        # plot the first ~50 singular values against their index
+        fig, ax = plt.subplots(1, figsize=(5, 5))
+
+        # quickly check can we plot 50 singlular values? If <50, plot them all
+        n_vecs = U.shape[0]
+        # check can we do 50 or not?
+        if n_vecs >= 50:
+            n_plot = 50
+        else:
+            n_plot = n_vecs
+
+        inds = np.arange(1, n_plot+1)
+        ax.loglog(inds, s[:n_plot], 'ko')
+        ax.loglog(inds, s[:n_plot], 'k-')
+        ax.set_xlabel('Singular value index [1 ind]')
+        ax.set_ylabel('Singular vale')
+        fig.tight_layout()
+        fig.savefig(output_filename)
+        fig.clf()
+        plt.close()
+        gc.collect()
+        return U, s, VT
 
     def calculate_cbv_snr(self, initial=False):
         """
@@ -491,6 +544,118 @@ class CBVs():
         logging.info(f"Targets removed: {targets_removed}")
         self.entropy_rejected_idx = rejected_idx
 
+    @staticmethod
+    def compute_entropy2(VT):
+        """
+        Compute the entropy of each CBV compared to a Guassian
+
+        Refactored TASOC U-matrix entropy code to accept the VT matrix
+        as per Kepler method. The TASOC code was essentially a clone of the
+        Kepler PDC matlab code.
+
+        Kepler PDC treated lcs as columns in the flux array. We did the same
+        in cotrendy. TASOC has lcs as rows, so used the U matrix for entropy
+        cleaning. We want to use the VT matrix, hence the tweaking.
+
+        I also wanted to do this so we can remove the use of external PCA library,
+        we already use the SVD code from scipy, which can do the same thing.
+
+        Assumes only the relevant slice of VT has been supplied
+        """
+        h_gauss0 = 0.5 + 0.5*np.log(2*np.pi)
+        n_cbvs = VT.shape[0]
+        h = np.empty(n_cbvs, dtype='float64')
+
+        for i in range(n_cbvs):
+            kde = KDE(np.abs(VT[i]))
+            kde.fit(gridsize=1000)
+
+            pdf = kde.density
+            x = kde.support
+
+            dx = x[1]-x[0]
+
+            # Calculate the Gaussian entropy
+            pdf_mean = bn.nansum(x * pdf)*dx
+            with np.errstate(invalid='ignore'):
+                sigma = np.sqrt(bn.nansum(((x - pdf_mean)**2) * pdf) * dx)
+            h_gauss = h_gauss0 + np.log(sigma)
+
+            # Calculate the actual vMatrix entropy
+            pdf_pos = (pdf > 0)
+            h_vmatrix = -np.sum(xlogy(pdf[pdf_pos], pdf[pdf_pos])) * dx
+
+            # Returned entropy is difference between V-Matrix entropy and Gaussian entropy of similar width (sigma)
+            h[i] = h_vmatrix - h_gauss
+
+        return h
+
+    def entropy_cleaning2(self, ncomponents):
+        """
+        Entropy-cleaning of lightcurve matrix using the SVD VT-matrix.
+        Identify stars which are increading the entropy of the CBVs, remove them
+        and repeat until there is no overrepresentation (typically entropy < -0.7)
+
+        This is taken directly from the Kepler and TASOC pipelines and modified for the VT matric SVD
+        """
+        # conversion constant from MAD to Sigma. Constant is 1/norm.ppf(3/4)
+        mad_to_sigma = 1.482602218505602
+        # added to track those rejected
+        rejected_idx = []
+
+        # limit VT to the first ncomponents rows
+        _, _, VT = self.calculate_svd(mode="entropy")
+        VT = VT[:ncomponents]
+
+        ent = self.compute_entropy2(VT)
+        logging.info(f"Entropy start: {ent}")
+
+        targets_removed = 0
+        components = np.arange(ncomponents)
+
+        with np.errstate(invalid='ignore'):
+            while np.any(ent < self.entropy_threshold):
+                com = components[ent < self.entropy_threshold][0]
+
+                # Remove highest relative weight target
+                m = bn.nanmedian(VT[com])
+                s = mad_to_sigma*bn.nanmedian(np.abs(VT[com] - m))
+                dev = np.abs(VT[com] - m) / s
+
+                idx0 = np.argmax(dev)
+                logging.info(f"{len(dev)}, {idx0}, {len(self.lc_idx_for_cbvs)}")
+
+                # store the id from the original matrix, so we can see which were rejected
+                rejected_idx.append(self.lc_idx_for_cbvs[idx0])
+                # then remove that element from the list of original IDs so the list length
+                # follows that of the matrix.
+                self.lc_idx_for_cbvs = np.delete(self.lc_idx_for_cbvs, idx0)
+
+                # Remove the star from the lightcurve matrix:
+                star_no = np.ones(VT.shape[1], dtype=bool)
+                star_no[idx0] = False
+                # remove the star from both the dithered and undithered arrays
+                self.norm_flux_array_for_cbvs = self.norm_flux_array_for_cbvs[star_no, :]
+                self.norm_flux_array_for_cbvs_dithered = self.norm_flux_array_for_cbvs_dithered[star_no, :]
+
+                targets_removed += 1
+                if targets_removed >= self.max_entropy_rejections:
+                    logging.warning(f"Entropy cleaning rejection limit {self.max_entropy_rejections} reached, breaking")
+                    break
+                elif len(self.norm_flux_array_for_cbvs_dithered) == 0:
+                    logging.critical("Entropy cleaning has removed all stars, quitting!")
+                    sys.exit(1)
+
+                # limit VT to the first ncomponets rows
+                _, _, VT = self.calculate_svd(mode="entropy")
+                VT = VT[:ncomponents]
+                ent = self.compute_entropy2(VT)
+
+        logging.info(f"Entropy end: {ent}")
+        logging.info(f"Targets removed: {targets_removed}")
+        self.entropy_rejected_idx = rejected_idx
+
+
     def calculate_cbvs(self):
         """
         Generate the CBVs from the input array normalised fluxes
@@ -546,7 +711,7 @@ class CBVs():
         self._apply_zero_mean_dither()
 
         # now calculate the initial svd, pre entropy cleaning
-        self.calculate_svd(initial=True)
+        self.U0, self.s0, self.VT0 = self.calculate_svd(mode="initial")
         for i in range(self.max_n_cbvs):
             self.cbvs0[i] = self.U0[:, i]
 
@@ -567,7 +732,7 @@ class CBVs():
         self.entropy_cleaning(n_components_to_entropy_check)
 
         # now calculate the final svd, post entropy cleaning
-        self.calculate_svd(initial=False)
+        self.U, self.s, self.VT = self.calculate_svd(mode="final")
         for i in range(self.max_n_cbvs):
             self.cbvs[i] = self.U[:, i]
 
