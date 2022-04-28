@@ -35,6 +35,7 @@ from cotrendy.utils import picklify, depicklify
 
 # TODO: move making theta to inside MAP.
 #       make it encompass both cond and prior vals so it doesn't fail!
+#       switch to VT entropy cleaning to match the ATBD
 
 class CBVs():
     """
@@ -146,6 +147,19 @@ class CBVs():
         # placeholders for variable star ids
         self.non_variable_star_idx = []
         self.variable_star_idx = []
+        # place to keep the coarse detrend coeffs
+        self.coeffs_store = []
+        self.coarse_coeffs_rejected_idx = []
+
+        # check if we want to coarse coeff reject?
+        try:
+            coarse_detrend_rejection_sigma = config['cotrend']['coarse_detrend_rejection_sigma']
+            if coarse_detrend_rejection_sigma > 0:
+                self.coarse_detrend_rejection_sigma = coarse_detrend_rejection_sigma
+            else:
+                self.coarse_detrend_rejection_sigma = None
+        except KeyError:
+            self.coarse_detrend_rejection_sigma = None
 
         # are we working in pixels or degrees for RA/Dec?
         # important for the fit coeff correlations plots
@@ -250,13 +264,16 @@ class CBVs():
             for target in self.targets:
                 delta_y.append(np.average(target.fluxerr_wtrend))
                 coeffs = np.polyfit(self.timesteps, target.flux_wtrend, self.variability_normalisation_order)
+                self.coeffs_store.append(coeffs)
                 besty = np.polyval(coeffs, self.timesteps)
                 # this was original flux_wtrend - besty, which seemed wrong
                 # as all the stars for CBVs were chosen as the fainest ones.
                 flattened = target.flux_wtrend - besty
                 sigma_y.append(np.std(flattened))
+            # cast the lists as arrays
             sigma_y = np.array(sigma_y)
             delta_y = np.array(delta_y)
+            self.coeffs_store = np.array(self.coeffs_store)
 
             # calculate the normalised variability
             V = sigma_y / delta_y
@@ -659,6 +676,35 @@ class CBVs():
         logging.info(f"Targets removed: {targets_removed}")
         self.entropy_rejected_idx = rejected_idx
 
+    def _find_atypical_coarse_detrended_stars(self, non_var_loc):
+        """
+        Look at the quiet stars (below norm var threshold)
+        and determine if any of them have coarse detrend fit
+        coeffs that are different from the group (based on
+        an amount of sigma rejection)
+        """
+        # somewhere to store the outlier's indexes
+        outliers = []
+        # how many fit coeffs are there to analyse?
+        _, n_coeffs = self.coeffs_store.shape
+        # only look at the non variable stars
+        coeffs = self.coeffs_store[non_var_loc]
+        # how many sigma beyond which to flag
+        scale = self.coarse_detrend_rejection_sigma
+
+        for n in range(n_coeffs):
+            mean = np.average(coeffs[:, n])
+            std = np.std(coeffs[:, n])
+            loc = np.where((((coeffs[:, n] > (mean+scale*std)) | (coeffs[:, n] < (mean-scale*std)))))[0]
+
+            for l in loc:
+                if l not in outliers:
+                    outliers.append(l)
+
+        # make the final array of the set of unique outliers
+        outliers = np.array(sorted(outliers))
+        return outliers
+
 
     def calculate_cbvs(self):
         """
@@ -682,6 +728,21 @@ class CBVs():
         self.calculate_normalised_variability()
         # make a cut of the _for_cbvs flux array, removing anything >= Var lim
         non_var_loc = np.where(self.variability < self.normalised_variability_limit)[0]
+        # do we want to reject stars based on their coarse detrend fit coeffs?
+        # if so check those with variability below the threshold for atypical coeffs
+        # and bumpt their variability by a lot, and mark their IDs for later
+        if self.coarse_detrend_rejection_sigma is not None:
+            # note this indexing is on the non_variable stars only
+            outliers = self._find_atypical_coarse_detrended_stars(non_var_loc)
+            # get outlier IDs in the full light curve array
+            self.coarse_coeffs_rejected_idx = self.lc_idx_for_cbvs[non_var_loc][outliers]
+            # bump the normalised_variability for those outliers
+            for ccr_idx in self.coarse_coeffs_rejected_idx:
+                self.variability[ccr_idx] += 5
+
+            # redo the variability cut after falsely bumping stars out based on their coeffs
+            non_var_loc = np.where(self.variability < self.normalised_variability_limit)[0]
+
         self.non_variable_star_idx = non_var_loc
         # for completeness, lets keep the ids of the variable objects too
         var_loc = np.where(self.variability >= self.normalised_variability_limit)[0]
