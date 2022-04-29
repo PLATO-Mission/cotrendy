@@ -417,7 +417,7 @@ class CBVs():
             logging.info("Calculating SVD for entropy cleaning...")
 
         U, s, VT = svd(self.norm_flux_array_for_cbvs_dithered.T)
-        logging.info(f"Matrix shapes -  U: {self.U.shape}, s: {self.s.shape}, VT: {self.VT.shape}")
+        logging.info(f"Matrix shapes -  U: {U.shape}, s: {s.shape}, VT: {VT.shape}")
 
         # plot the first ~50 singular values against their index
         fig, ax = plt.subplots(1, figsize=(5, 5))
