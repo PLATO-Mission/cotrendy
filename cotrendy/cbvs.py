@@ -280,6 +280,10 @@ class CBVs():
             median_V = np.median(V)
             self.variability = V / median_V
 
+    def plot_normalised_variability(self):
+        """
+        Plot the normalised variability
+        """
         try:
             # set log V for plotting
             logV = np.log10(self.variability)
@@ -747,6 +751,9 @@ class CBVs():
         # for completeness, lets keep the ids of the variable objects too
         var_loc = np.where(self.variability >= self.normalised_variability_limit)[0]
         self.variable_star_idx = var_loc
+
+        # plot the normalised variability
+        self.plot_normalised_variability()
 
         self.norm_flux_array_for_cbvs = self.norm_flux_array_for_cbvs[non_var_loc]
         self.lc_idx_for_cbvs = self.lc_idx_for_cbvs[non_var_loc]
