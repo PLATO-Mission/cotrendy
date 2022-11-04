@@ -915,13 +915,15 @@ class CBVs():
             self.theta[j] = np.linspace(theta_llim, theta_ulim, 1000)
 
     @staticmethod
-    def _fit_cbv_to_data(x, y, cbv):
+    def _fit_cbv_to_data(theta, partially_corrected_flux_array, cbv):
         """
         Function to subtract CBV from data.
         Used when fitting coefficients with
         scipy.optimize.least_squares
+
         """
-        return y - (x[0]* cbv)
+        partially_corrected_flux_array = partially_corrected_flux_array - (theta*cbv)
+        return partially_corrected_flux_array
 
     def calculate_robust_fit_coeffs_sequen(self):
         """
@@ -933,36 +935,36 @@ class CBVs():
         """
         logging.info("Calculating CBVs fit coeffs...")
 
-        # initial guess at fit coeff
-        x0 = [-0.1]
+        # initial guess at fit coefif
+        x0 = -0.1
 
         # keep a list of partially corrected lcs to use if > 1 CBV
         # CBVs are fitted and removed sequentially before the next is fit
         partial_correction_array = np.copy(self.norm_flux_array)
 
         # loop over the existing CBVs
-        for j in sorted(self.cbvs):
-            for i in range(0, len(partial_correction_array)):
+        for k in sorted(self.cbvs):
+            for m in range(0, len(partial_correction_array)):
                 # we fit with the loss function = soft_l1, which gives a robust fit
                 # wrt to outliers in the data
                 res = optimization.least_squares(self._fit_cbv_to_data,
                                                  x0,
-                                                 args=(partial_correction_array[i], self.cbvs[j]),
+                                                 args=(partial_correction_array[m], self.cbvs[k]),
                                                  loss='soft_l1')
                 # now take the result and store it, but use it now
                 # to correct the data in the partial correction array.
                 # This partially corrected data can be fit for the next CBV
                 fc = res['x'][0]
-                self.fit_coeffs[j].append(fc)
-                partial_correction_array[i] -= self.cbvs[j]*fc
+                self.fit_coeffs[k].append(fc)
+                partial_correction_array[m] -= self.cbvs[k]*fc
             # cast this as a lovely numpy array when done, lists suck
-            self.fit_coeffs[j] = np.array(self.fit_coeffs[j])
+            self.fit_coeffs[k] = np.array(self.fit_coeffs[k])
             # now we have the full range of fit coeffs, we can make
             # theta which will be used in MAP for generating PDFs
-            theta_range = np.percentile(self.fit_coeffs[j], 95) - np.percentile(self.fit_coeffs[j], 5)
-            theta_llim = np.percentile(self.fit_coeffs[j], 5) - theta_range
-            theta_ulim = np.percentile(self.fit_coeffs[j], 95) + theta_range
-            self.theta[j] = np.linspace(theta_llim, theta_ulim, 2500)
+            theta_range = np.percentile(self.fit_coeffs[k], 95) - np.percentile(self.fit_coeffs[k], 5)
+            theta_llim = np.percentile(self.fit_coeffs[k], 5) - theta_range
+            theta_ulim = np.percentile(self.fit_coeffs[k], 95) + theta_range
+            self.theta[k] = np.linspace(theta_llim, theta_ulim, 2500)
 
     def plot_fit_coeff_correlations(self, catalog):
         """
@@ -1243,7 +1245,9 @@ def worker_fn(star_id, norm_flux, variability, constants):
         traceback.print_exc(file=sys.stdout)
         logging.warning("MAP failed, skipping...")
         n_data_points = len(norm_flux)
-        return star_id, np.zeros(n_data_points)
+        end = datetime.utcnow()
+        diff_time = (end - start).seconds
+        return star_id, np.zeros(n_data_points), diff_time
 
     # make plots for the test stars
     if star_id in test_stars or debug:

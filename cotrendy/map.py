@@ -16,8 +16,8 @@ from scipy.signal import periodogram
 
 class MAP():
     """
-    Take a set of CBVs fit coeffs and use the MAP method
-    to cotrend a series of light curves.
+    Take a set of CBVs, fit coeffs and light curves and use the
+    MAP method to cotrend the data
 
     There is a MAP instance for each light curve
 
@@ -33,13 +33,15 @@ class MAP():
 
         Parameters
         ----------
-        catalog : Catalog object
-            Contains information about the targets
-            RA, Dec, Mag and ID
-        cbvs : CBVs object
-            Contains information about the basis vectors
         tus_id : int
             Current target index being analysed
+        norm_flux : array
+            Flux array for the target being analysed
+        variability : float
+            Normalised variability metric for the target being analysed
+        const : tuple
+            Series of constant data required for MAP correction
+            of the target being analysed
         """
 
         # unpack new const tuple
@@ -107,14 +109,14 @@ class MAP():
         self.posterior_pdf = defaultdict(np.array)
         self.posterior_peak_theta = defaultdict(list)
         self.posterior_peak_pdf = defaultdict(list)
-        self.posterior_max_success = defaultdict(list)
+        self.posterior_max_success = defaultdict(bool)
 
         # make a mask to exclude the current tus
         # if there is a cbv mask we check this object is not in there
         mask = np.where(lc_idx_for_cbvs != tus_id)[0]
         self.prior_mask = lc_idx_for_cbvs[mask]
 
-        # calculate the PDFs
+        # calculate the PDFs (1 per CBV) for this object
         self.calculate_prior_pdfs(catalog, cbvs, fit_coeffs, theta, n_cbvs)
 
         # analyse the info we have, if the prior_goodness is poor
@@ -125,6 +127,7 @@ class MAP():
             self.mode = "LS"
             # we stop here and MAP defaults to LS
         else:
+            # calculate the conditional PDFs (1 per object) for this object
             self.calculate_conditional_pdfs(cbvs, theta)
 
             # finally combine the PDFs above into the posterior and maximise
@@ -145,15 +148,22 @@ class MAP():
 
         Taken from eqs 17 and 18 of Smith et al. 2012 Kepler PDC paper.
 
-        Note: here we have ra, dec and gmag equally weighted
+        Note: here we have ra, dec and mag equally weighted
 
         Parameters
         ----------
         catalog : Catalog object
             Contains information about the targets
             RA, Dec, Mag and ID
-        cbvs : CBVs object
-            Contains information about the basis vectors
+        cbvs : defaultdict
+            Dictionary of basis vectors
+        fit_coeffs : defaultdict
+            Dictionary of fit coefficients per CBV and object
+        theta : defaultdict
+            Dictionary of theta values over which to calculate the
+            conditional PDF
+        n_cbvs : int
+            Number of high SNR CBVs
         """
         lamb = np.matrix(np.diag([mad(catalog.ra[self.prior_mask])/catalog.ra_weight,
                                   mad(catalog.dec[self.prior_mask])/catalog.dec_weight,
@@ -382,11 +392,11 @@ class MAP():
                 self.prior_snapped_to_cond[cbv_id] = False
 
             if peak_theta is None or peak_pdf is None:
-                self.posterior_max_success[cbv_id].append(False)
+                self.posterior_max_success[cbv_id] = False
                 self.posterior_peak_theta[cbv_id] = 0.0
                 self.posterior_peak_pdf[cbv_id] = 0.0
             else:
-                self.posterior_max_success[cbv_id].append(True)
+                self.posterior_max_success[cbv_id] = True
                 self.posterior_peak_theta[cbv_id] = peak_theta
                 self.posterior_peak_pdf[cbv_id] = peak_pdf
 
