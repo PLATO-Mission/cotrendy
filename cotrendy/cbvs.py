@@ -19,6 +19,7 @@ import bottleneck as bn
 from scipy.special import xlogy
 from statsmodels.nonparametric.kde import KDEUnivariate as KDE
 from sklearn.decomposition import PCA
+from sklearn.utils.extmath import svd_flip
 # import for plotting
 import matplotlib
 matplotlib.use('Agg')
@@ -337,63 +338,6 @@ class CBVs():
         dither = np.random.normal(loc=0.0, scale=0.001, size=n_light_curves)
         self.norm_flux_array_for_cbvs_dithered = self.norm_flux_array_for_cbvs + dither.reshape(n_light_curves, 1)
 
-    def calculate_svd_old(self, initial=False):
-        """
-        Replaced to make a more useful version of this function
-
-        Take the previously filtered flux array and calculate the SVD
-
-        We apply a zero mean dither before hand
-
-        Initial flag allows us to store results in arrays with 0 suffix, indicating initial pass.
-        .
-        This allows a pre and post entropy cleaning check on the CBVs
-        """
-
-        # TODO: delete this function later once tested
-
-        # now we take the SVD of the highest correlated light curves
-        # NOTE fluxes need to be in columns in order for the left-singular maxtrix (U)
-        # to return us the CBVs in order
-        if initial:
-            logging.info("Calculating the initial SVD...")
-            self.U0, self.s0, self.VT0 = svd(self.norm_flux_array_for_cbvs_dithered.T)
-            output_filename = f"{self.direc}/singular_values_{self.camera_id}_{self.phot_file}_initial.pdf"
-            sing_vals = self.s0
-            logging.info(f"Matrix shapes -  U: {self.U0.shape}, s: {self.s0.shape}, VT: {self.VT0.shape}")
-        else:
-            logging.info("Calculating the final SVD...")
-            self.U, self.s, self.VT = svd(self.norm_flux_array_for_cbvs_dithered.T)
-            output_filename = f"{self.direc}/singular_values_{self.camera_id}_{self.phot_file}.pdf"
-            sing_vals = self.s
-            logging.info(f"Matrix shapes -  U: {self.U.shape}, s: {self.s.shape}, VT: {self.VT.shape}")
-
-        # plot the first ~50 singular values against their index
-        fig, ax = plt.subplots(1, figsize=(5, 5))
-
-        # quickly check can we plot 50 singlular values? If <50, plot them all
-        if initial:
-            n_vecs = self.U0.shape[0]
-        else:
-            n_vecs = self.U.shape[0]
-
-        # check can we do 50 or not?
-        if n_vecs >= 50:
-            n_plot = 50
-        else:
-            n_plot = n_vecs
-
-        inds = np.arange(1, n_plot+1)
-        ax.loglog(inds, sing_vals[:n_plot], 'ko')
-        ax.loglog(inds, sing_vals[:n_plot], 'k-')
-        ax.set_xlabel('Singular value index [1 ind]')
-        ax.set_ylabel('Singular vale')
-        fig.tight_layout()
-        fig.savefig(output_filename)
-        fig.clf()
-        plt.close()
-        gc.collect()
-
     def calculate_svd(self, mode="initial"):
         """
         Take the previously filtered flux array and calculate the SVD
@@ -416,8 +360,11 @@ class CBVs():
         else:
             logging.info("Calculating SVD for entropy cleaning...")
 
-        U, s, VT = svd(self.norm_flux_array_for_cbvs_dithered.T)
+        U, s, VT = svd(self.norm_flux_array_for_cbvs_dithered.T, full_matrices=False)
         logging.info(f"Matrix shapes -  U: {U.shape}, s: {s.shape}, VT: {VT.shape}")
+
+        # taken from sklearn.decomposition.PCA full to ensure vectors are deterministic
+        U, VT = svd_flip(U, VT)
 
         # plot the first ~50 singular values against their index
         fig, ax = plt.subplots(1, figsize=(5, 5))
@@ -512,8 +459,6 @@ class CBVs():
 
         This is taken directly from the TASOC pipeline
         """
-        # TODO: remove later once new code is tested
-
         # conversion constant from MAD to Sigma. Constant is 1/norm.ppf(3/4)
         mad_to_sigma = 1.482602218505602
         # added to track those rejected - jmcc
@@ -708,7 +653,6 @@ class CBVs():
         # make the final array of the set of unique outliers
         outliers = np.array(sorted(outliers))
         return outliers
-
 
     def calculate_cbvs(self):
         """
