@@ -13,7 +13,7 @@ from collections import defaultdict
 import numpy as np
 from scipy.linalg import svd
 import scipy.optimize as optimization
-from scipy.stats import median_absolute_deviation
+from scipy.stats import median_abs_deviation
 # imports for entropy from TASOC
 import bottleneck as bn
 from scipy.special import xlogy
@@ -933,7 +933,7 @@ class CBVs():
 
                 # do some stats to limit the coeffs axis
                 med = np.median(self.fit_coeffs[cbv_id])
-                mad = median_absolute_deviation(self.fit_coeffs[cbv_id])
+                mad = median_abs_deviation(self.fit_coeffs[cbv_id])
                 llim = med - 5*mad
                 ulim = med + 5*mad
 

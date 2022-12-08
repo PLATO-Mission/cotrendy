@@ -6,7 +6,7 @@ from collections import defaultdict
 import numpy as np
 from scipy.stats import gaussian_kde
 from scipy.integrate import simps
-from scipy.stats import median_absolute_deviation as mad
+from scipy.stats import median_abs_deviation as mad
 from scipy.signal import periodogram
 
 # pylint: disable=invalid-name

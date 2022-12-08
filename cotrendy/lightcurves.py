@@ -4,7 +4,7 @@ Light curves components for Cotrendy
 import sys
 import logging
 import numpy as np
-from scipy.stats import median_absolute_deviation
+from scipy.stats import median_abs_deviation
 import cotrendy.utils as cuts
 
 def load_photometry(config, apply_object_mask=True):
@@ -134,7 +134,7 @@ class Lightcurve():
         for i in np.arange(beta, len(self.flux_wtrend)-beta-1):
             window = self.flux_wtrend[i-beta: i+beta+1]
             med = np.median(window)
-            mad = median_absolute_deviation(window)
+            mad = median_abs_deviation(window)
             outlier_positions = np.where(((window >= med+alpha*mad) |
                                           (window <= med-alpha*mad)))[0] + i - beta
 
