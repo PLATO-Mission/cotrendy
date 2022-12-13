@@ -226,6 +226,9 @@ class CBVs():
         self.norm_flux_array_for_cbvs = np.copy(self.norm_flux_array)
         self.lc_idx_for_cbvs = np.copy(self.lc_idx)
 
+        # adds a numpy random seed for repeatability
+        self.seed = 999
+
         # here were take in some parameters which are passed to MAP if needed
         # TODO: remove the try after these parameters are standard in the config files
         try:
@@ -335,6 +338,7 @@ class CBVs():
         """
         logging.info("Applying zero mean dither...")
         n_light_curves = len(self.norm_flux_array_for_cbvs)
+        np.random.seed(self.seed)
         dither = np.random.normal(loc=0.0, scale=0.001, size=n_light_curves)
         self.norm_flux_array_for_cbvs_dithered = self.norm_flux_array_for_cbvs + dither.reshape(n_light_curves, 1)
 
